@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yapay Zeka Chat Simülasyonu</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #1e1e1e;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  .chat-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .questions-btn {
+    background: #ff9800;
+    border: none;
+    padding: 10px 20px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .questions-list {
+    display: none;
+    background: #333;
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    width: 450px;
+  }
+  .questions-list div {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #444;
+  }
+  .questions-list div:hover {
+    background: #555;
+  }
+  .chat-container {
+    width: 450px;
+    height: 500px;
+    background: #2c2c2c;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  }
+  .chat-messages {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+  }
+  .message {
+    margin: 5px 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    max-width: 80%;
+  }
+  .user {
+    background: #4caf50;
+    align-self: flex-end;
+  }
+  .ai {
+    background: #2196f3;
+    align-self: flex-start;
+  }
+  .chat-input {
+    display: flex;
+    border-top: 1px solid #444;
+  }
+  .chat-input input {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    outline: none;
+    background: #333;
+    color: #fff;
+  }
+  .chat-input button {
+    padding: 10px 15px;
+    border: none;
+    background: #4caf50;
+    color: #fff;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="chat-wrapper">
+  <button class="questions-btn" onclick="toggleQuestions()">Sorular</button>
+  <div class="questions-list" id="questionsList"></div>
+
+  <div class="chat-container">
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="Mesajınızı yazın..." />
+      <button onclick="sendMessage()">Gönder</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// AI cevapları
+const aiLogic = [
+  { keywords: ["merhaba", "selam", "hey"], response: "Merhaba! Nasılsın?" },
+  { keywords: ["nasılsın"], response: "Ben iyiyim, sen nasılsın?" },
+  { keywords: ["hava"], response: "Hava hakkında bilgi veremem ama umarım güzel!" },
+  { keywords: ["adın ne"], response: "Benim adım Yapay Zeka Simülasyonu!" },
+  { keywords: ["yaşın"], response: "Ben bir bilgisayar programıyım, yaşım yok 😄" },
+  { keywords: ["seviyen"], response: "Ben temel bir simülasyonum, öğrenmeye çalışıyorum." },
+  { keywords: ["favori renk", "renk"], response: "Renkleri göremem ama mavi kulağa güzel geliyor." },
+  { keywords: ["programlama"], response: "Ben MinusScript ile yazıldım!" },
+  { keywords: ["müzik"], response: "Müzik güzel bir konu! Hangi türü seviyorsun?" },
+  { keywords: ["oyun"], response: "Oyunlar eğlenceli! En sevdiğin oyun hangisi?" },
+  { keywords: ["film"], response: "Film izlemeyi sever misin? Benim favorim yok ama önerilere açığım." },
+  { keywords: ["kitap"], response: "Kitaplar çok öğretici olabilir! En sevdiğin kitap hangisi?" },
+  { keywords: ["spor"], response: "Spor sağlıklı! Sen hangi sporu seviyorsun?" },
+  { keywords: ["tatil"], response: "Tatil harika bir fikir! Nereleri gezmeyi seversin?" },
+  { keywords: ["yemek"], response: "Yemekler konusunda bir AI olarak deneyimim yok ama fikirlerimi paylaşabilirim." },
+  { keywords: ["kahve"], response: "Kahve sever misin? Benim tad alma duyum yok 😄" },
+  { keywords: ["çay"], response: "Çay güzel bir içecek! Tercihin hangisi?" },
+  { keywords: ["kodlama"], response: "Kodlama eğlenceli! Hangi dili öğreniyorsun?" },
+  { keywords: ["hava durumu"], response: "Hava durumu için güncel bilgiye erişemem ama umarım güneşlidir!" },
+  { keywords: ["robot"], response: "Ben bir simülasyonum, yani bir tür yazılım robotuyum." },
+  { keywords: ["gelecek"], response: "Gelecek her zaman bilinmez ama umut verici olabilir." },
+  { keywords: ["hayal"], response: "Hayaller çok önemlidir! Senin hayalin nedir?" },
+  { keywords: ["ev"], response: "Evler güvenli bir yer sağlar. Senin evin nasıl?" },
+  { keywords: ["teknoloji"], response: "Teknoloji hayatımızın büyük bir parçası!" },
+  { keywords: ["internet"], response: "Ben internet üzerinden çalışıyorum!" },
+  { keywords: ["arkadaş"], response: "Arkadaşlar hayatı güzelleştirir. Senin en yakın arkadaşın kim?" },
+  { keywords: ["tatlı"], response: "Tatlıları sever misin? Ben deneyemem ama fikirler verebilirim." },
+  { keywords: ["film öneri"], response: "Popüler bir film önerisi: Interstellar. İzledin mi?" },
+  { keywords: ["müzik türü"], response: "Müzik türleri çok çeşitlidir, senin favorin hangisi?" },
+  { keywords: ["hava nasıl"], response: "Hava hakkında anlık bilgi veremem ama umarım güzel bir gün geçiriyorsun!" }
+];
+
+// Hafıza
+let memory = {};
+
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
+const questionsListDiv = document.getElementById('questionsList');
+
+// Sorular butonu
+function toggleQuestions() {
+  if (questionsListDiv.style.display === "none") {
+    questionsListDiv.style.display = "block";
+  } else {
+    questionsListDiv.style.display = "none";
+  }
+}
+
+// Sorular listesi oluştur
+function createQuestionsList() {
+  questionsListDiv.innerHTML = "";
+  aiLogic.forEach(item => {
+    const div = document.createElement('div');
+    div.textContent = item.keywords[0]; // Soru başlığı olarak ilk keyword
+    div.onclick = () => {
+      userInput.value = item.keywords[0];
+      sendMessage();
+      questionsListDiv.style.display = "none";
+    };
+    questionsListDiv.appendChild(div);
+  });
+}
+
+// Gönderme fonksiyonu
+function sendMessage() {
+  const message = userInput.value.trim().toLowerCase();
+  if (!message) return;
+
+  // Kullanıcı mesajı
+  const userMsgDiv = document.createElement('div');
+  userMsgDiv.className = 'message user';
+  userMsgDiv.textContent = userInput.value;
+  chatMessages.appendChild(userMsgDiv);
+
+  let aiResponse;
+
+  // Hafızadan kontrol
+  if (memory[message]) {
+    aiResponse = memory[message];
+  } else {
+    // Mantığa göre kontrol
+    aiResponse = "Bunu biraz açabilir misin?";
+    for (const logic of aiLogic) {
+      for (const keyword of logic.keywords) {
+        if (message.includes(keyword)) {
+          aiResponse = logic.response;
+          break;
+        }
+      }
+    }
+    // Hafızaya kaydet
+    memory[message] = aiResponse;
+  }
+
+  // AI mesajı
+  const aiMsgDiv = document.createElement('div');
+  aiMsgDiv.className = 'message ai';
+  aiMsgDiv.textContent = aiResponse;
+  chatMessages.appendChild(aiMsgDiv);
+
+  // Scroll en alta
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  userInput.value = '';
+  userInput.focus();
+}
+
+// Enter tuşu ile gönderim
+userInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') sendMessage();
+});
+
+// Sayfa yüklenince sorular listesi oluştur
+createQuestionsList();
+</script>
+</body>
+</html>

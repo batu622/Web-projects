@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medya Görüntüleyici</title>
+<style>
+body { font-family: sans-serif; margin:0; background:#f0f2f5; }
+.container { width:90%; max-width:900px; margin:auto; text-align:center; padding:20px; }
+.drop-area { border:2px dashed #ccc; padding:30px; border-radius:10px; cursor:pointer; margin-bottom:20px; background:#fff; }
+.fixed-btn { position:fixed; left:20px; padding:10px 15px; border:none; border-radius:8px; background:#ffcc00; cursor:pointer; font-weight:bold; z-index:2000; }
+#creatorBtn { bottom:260px; }
+#guideBtn { bottom:300px; }
+#versionBtn { bottom:220px; }
+#tetrisBtn { bottom:180px; }
+.guide-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index:3000; display:none; }
+.guide-content { background:#fff; padding:20px 30px; border-radius:10px; max-width:600px; max-height:80%; overflow:auto; position:relative; }
+.close-guide { position:absolute; top:10px; right:20px; cursor:pointer; font-size:20px; }
+.media-item { display:inline-block; margin:10px; padding:10px; background:#fff; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+.media-item p { margin:5px 0; }
+button.edit-btn { margin-top:5px; padding:5px 8px; border:none; border-radius:5px; background:#007bff; color:#fff; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Medya Görüntüleyici</h1>
+    <div id="dropArea" class="drop-area">Dosyaları buraya sürükleyin veya tıklayın
+        <input type="file" id="mediaInput" multiple hidden>
+    </div>
+    <div id="gallery"></div>
+</div>
+
+<!-- Sabit butonlar -->
+<button id="creatorBtn" class="fixed-btn">Creator</button>
+<button id="guideBtn" class="fixed-btn">Kılavuz</button>
+<button id="versionBtn" class="fixed-btn">Sürüm</button>
+<button id="tetrisBtn" class="fixed-btn">Tetris</button>
+
+<!-- Kılavuz Modal -->
+<div id="guideModal" class="guide-modal">
+    <div class="guide-content">
+        <span id="closeGuide" class="close-guide">&times;</span>
+        <h2>Kullanım Kılavuzu</h2>
+        <ul>
+            <li>Dosya yüklemek için alanı tıklayın veya sürükleyin.</li>
+            <li>Galerideki öğelere tıklayarak görüntüleyebilirsiniz.</li>
+            <li>“Düzenle” butonuna basarak isim/açıklama ekleyin veya değiştirin.</li>
+            <li>“Creator” butonuna tıklayarak geliştiricinin Reddit sayfasına gidin.</li>
+            <li>“Sürüm” butonuna tıklayınca uygulama sürümünü görün.</li>
+            <li>“Tetris” butonuna tıklayınca Tetris oyunu dosyası cihazınıza indirilir.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', ()=> {
+    // Creator
+    document.getElementById('creatorBtn').addEventListener('click', ()=> {
+        window.open('https://www.reddit.com/user/Abject-Ad-2320/', '_blank');
+    });
+
+    // Guide
+    const guideModal = document.getElementById('guideModal');
+    document.getElementById('guideBtn').addEventListener('click', ()=> { guideModal.style.display='flex'; });
+    document.getElementById('closeGuide').addEventListener('click', ()=> { guideModal.style.display='none'; });
+    window.addEventListener('click', e => { if(e.target===guideModal) guideModal.style.display='none'; });
+
+    // Version
+    document.getElementById('versionBtn').addEventListener('click', ()=> {
+        alert("sürüm: 3.0.4.25");
+    });
+
+    // Tetris (indir)
+    document.getElementById('tetrisBtn').addEventListener('click', ()=>{
+        const link = document.createElement('a');
+        link.href = "ab12d9b4-5188-491d-a4c5-2e63edca4481.html"; // Tetris dosyası
+        link.download = "tetris.html"; // indirilen dosya adı
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    // Medya yükleme
+    const dropArea = document.getElementById('dropArea');
+    const mediaInput = document.getElementById('mediaInput');
+    const gallery = document.getElementById('gallery');
+
+    function handleFiles(files){
+        for(let file of files){
+            const item = document.createElement('div');
+            item.className = "media-item";
+
+            let el;
+            if(file.type.startsWith('image')){
+                el = document.createElement('img');
+            } else if(file.type.startsWith('video')){
+                el = document.createElement('video');
+                el.controls = true;
+            } else if(file.type.startsWith('audio')){
+                el = document.createElement('audio');
+                el.controls = true;
+            } else {
+                el = document.createElement('p');
+                el.textContent = "Desteklenmeyen dosya";
+            }
+
+            if(el.tagName !== "P") el.src = URL.createObjectURL(file);
+            el.style.maxWidth = "200px";
+            el.style.borderRadius = "5px";
+
+            const nameP = document.createElement('p');
+            nameP.textContent = "İsim: " + file.name;
+            const descP = document.createElement('p');
+            descP.textContent = "Açıklama: -";
+
+            const editBtn = document.createElement('button');
+            editBtn.className="edit-btn";
+            editBtn.textContent="Düzenle";
+            editBtn.addEventListener('click', ()=>{
+                const newName = prompt("Yeni isim:", file.name);
+                if(newName) nameP.textContent = "İsim: " + newName;
+                const newDesc = prompt("Yeni açıklama:", "");
+                if(newDesc) descP.textContent = "Açıklama: " + newDesc;
+            });
+
+            item.appendChild(el);
+            item.appendChild(nameP);
+            item.appendChild(descP);
+            item.appendChild(editBtn);
+            gallery.appendChild(item);
+        }
+    }
+
+    dropArea.addEventListener('click', ()=> mediaInput.click());
+    dropArea.addEventListener('dragover', e=> { e.preventDefault(); dropArea.style.background='#ffcc00'; });
+    dropArea.addEventListener('dragleave', e=> { e.preventDefault(); dropArea.style.background=''; });
+    dropArea.addEventListener('drop', e=> { e.preventDefault(); dropArea.style.background=''; handleFiles(e.dataTransfer.files); });
+    mediaInput.addEventListener('change', ()=> handleFiles(mediaInput.files));
+});
+</script>
+
+</body>
+</html>

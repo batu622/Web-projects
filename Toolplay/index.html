@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ToolPlay Studio (Beta)</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      height: 100vh;
+    }
+    nav {
+      width: 200px;
+      background: #222;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+    }
+    nav button {
+      background: #333;
+      color: white;
+      border: none;
+      margin: 5px 0;
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    nav button:hover {
+      background: #555;
+    }
+    iframe {
+      flex: 1;
+      border: none;
+      background: #111;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <h3>ToolPlay Studio</h3>
+    <button onclick="loadApp('calculator')">🧮 Hesap Makinesi</button>
+    <button onclick="loadApp('notepad')">📝 Not Defteri</button>
+    <button onclick="loadApp('snake')">🐍 Yılan Oyunu</button>
+    <button onclick="loadApp('chat')">💬 Mesajlaşma</button>
+    <button onclick="loadApp('media')">🎵 Medya Oynatıcı</button>
+    <button onclick="loadApp('ai')">🤖yapay zeka sohbet</button>
+ 
+ </nav>
+
+  <iframe id="appFrame" src="./apps/calculator.html"></iframe>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

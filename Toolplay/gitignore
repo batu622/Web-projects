@@ -1,0 +1,14 @@
+
+node_modules/
+dist/
+build/
+
+# Log dosyaları
+*.log
+
+# Ortam dosyaları
+.env
+
+# Sistem dosyaları
+.DS_Store
+Thumbs.db

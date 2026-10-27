@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<style>
+body {
+  background: #1b1b1b;
+  color: white;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+input {
+  width: 200px;
+  height: 40px;
+  font-size: 20px;
+  text-align: right;
+}
+button {
+  width: 45px;
+  height: 45px;
+  margin: 5px;
+  font-size: 18px;
+}
+</style>
+</head>
+<body>
+<h2>Hesap Makinesi</h2>
+<input id="display" readonly>
+<div>
+  <button onclick="add('7')">7</button><button onclick="add('8')">8</button><button onclick="add('9')">9</button><button onclick="add('/')">÷</button><br>
+  <button onclick="add('4')">4</button><button onclick="add('5')">5</button><button onclick="add('6')">6</button><button onclick="add('*')">×</button><br>
+  <button onclick="add('1')">1</button><button onclick="add('2')">2</button><button onclick="add('3')">3</button><button onclick="add('-')">−</button><br>
+  <button onclick="add('0')">0</button><button onclick="add('.')">.</button><button onclick="calc()">=</button><button onclick="add('+')">+</button><br>
+  <button onclick="clr()">Temizle</button>
+</div>
+<script>
+function add(v){display.value+=v;}
+function calc(){try{display.value=eval(display.value);}catch{display.value="Hata";}}
+function clr(){display.value='';}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "toolplay",
+  "version": "1.0.0-beta",
+  "description": "Araçlar ve oyunların birleştiği çok amaçlı Electron uygulaması.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^32.0.0",
+    "three": "^0.165.0"
+  }
+}
