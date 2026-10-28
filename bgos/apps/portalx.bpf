@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PortalX — Modern Web Portalı</title>
+  <meta name="color-scheme" content="light dark" />
+  <style>
+    /* ========= Design Tokens ========= */
+    :root {
+      --bg: #0f1115;
+      --bg-elev: #151922;
+      --surface: #1b2130;
+      --text: #e6e9ef;
+      --muted: #9aa3b2;
+      --brand: #7aa2f7;
+      --accent: #2ac3de;
+      --danger: #ff757f;
+      --success: #7fd1b9;
+      --border: #2a3140;
+
+      --ring: 3px;
+      --radius: 12px;
+      --shadow-1: 0 6px 20px rgba(0,0,0,0.3);
+      --shadow-2: 0 12px 32px rgba(0,0,0,0.35);
+
+      --gap-1: 8px;
+      --gap-2: 12px;
+      --gap-3: 16px;
+      --gap-4: 24px;
+      --gap-5: 32px;
+
+      --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+      --grid-max: 1280px;
+    }
+    :root.light {
+      --bg: #f7f8fa;
+      --bg-elev: #ffffff;
+      --surface: #ffffff;
+      --text: #1a1f2b;
+      --muted: #6b7280;
+      --brand: #2f6feb;
+      --accent: #0ea5e9;
+      --danger: #dc2626;
+      --success: #059669;
+      --border: #e5e7eb;
+      --shadow-1: 0 6px 20px rgba(0,0,0,0.08);
+      --shadow-2: 0 12px 32px rgba(0,0,0,0.1);
+    }
+
+    /* ========= Base ========= */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      color: var(--text);
+      background: linear-gradient(180deg, var(--bg) 0%, rgba( var(--bg), 0 ) 100% ), var(--bg);
+      overflow: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; color: inherit; cursor: pointer; }
+    :focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 var(--ring) color-mix(in oklab, var(--brand) 55%, transparent);
+      border-radius: 8px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+
+    /* ========= Layout ========= */
+    .app {
+      display: grid;
+      grid-template-rows: 64px 1fr;
+      grid-template-columns: 260px 1fr;
+      grid-template-areas:
+        "topbar topbar"
+        "sidebar main";
+      height: 100vh;
+    }
+    .topbar {
+      grid-area: topbar;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--gap-3);
+      background: var(--bg-elev);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 5;
+    }
+    .brand {
+      display: flex; align-items: center; gap: var(--gap-2);
+      font-weight: 700; letter-spacing: 0.2px;
+    }
+    .top-actions { display: flex; gap: var(--gap-2); align-items: center; position: relative; }
+    .icon-btn {
+      display: grid; place-items: center;
+      width: 36px; height: 36px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 10px;
+      box-shadow: var(--shadow-1);
+      position: relative;
+      transition: transform .15s ease, background .2s ease, border-color .2s ease;
+    }
+    .icon-btn:hover { transform: translateY(-1px); background: color-mix(in oklab, var(--surface) 80%, var(--accent)); }
+    .icon-btn[aria-pressed="true"] { border-color: var(--brand); }
+
+    .sidebar {
+      grid-area: sidebar;
+      background: var(--bg-elev);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: var(--gap-3);
+      gap: var(--gap-2);
+      overflow: auto;
+    }
+    .sidebar .section-label { font-size: 12px; color: var(--muted); margin: var(--gap-2) 0; }
+    .nav {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .nav a {
+      display: flex; align-items: center; gap: var(--gap-2);
+      padding: 10px 12px;
+      border-radius: 10px;
+      color: var(--text);
+      border: 1px solid transparent;
+      transition: background .2s ease, border-color .2s ease;
+    }
+    .nav a[aria-current="page"],
+    .nav a:hover {
+      background: color-mix(in oklab, var(--surface) 80%, var(--brand));
+      border-color: color-mix(in oklab, var(--border) 60%, var(--brand));
+    }
+    .collapse-toggle {
+      display: flex; align-items: center; gap: var(--gap-2);
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface);
+      cursor: pointer;
+    }
+
+    .main {
+      grid-area: main;
+      overflow: auto;
+      padding: var(--gap-4);
+      background:
+        radial-gradient(1000px 300px at 20% -10%, color-mix(in oklab, var(--accent) 18%, transparent), transparent),
+        radial-gradient(800px 240px at 90% -20%, color-mix(in oklab, var(--brand) 14%, transparent), transparent);
+    }
+    .content {
+      max-width: var(--grid-max);
+      margin: 0 auto;
+      display: grid;
+      gap: var(--gap-4);
+    }
+
+    /* ========= Components ========= */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-1);
+      padding: var(--gap-4);
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: var(--gap-4);
+    }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+
+    @media (max-width: 1024px) {
+      .app { grid-template-columns: 80px 1fr; }
+      .sidebar .label { display: none; }
+      .col-8 { grid-column: span 12; }
+      .col-6 { grid-column: span 12; }
+      .col-4 { grid-column: span 6; }
+    }
+    @media (max-width: 640px) {
+      .app { grid-template-columns: 0 1fr; }
+      .sidebar { display: none; }
+      .col-4 { grid-column: span 12; }
+    }
+
+    .card-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--gap-3); }
+    .stat {
+      display: flex; align-items: center; gap: var(--gap-3);
+    }
+    .stat .value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .trend { font-size: 12px; color: var(--muted); }
+
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+    th:hover { color: var(--text); }
+    tr:hover { background: color-mix(in oklab, var(--surface) 85%, var(--accent)); }
+
+    .filters {
+      display: flex; gap: var(--gap-2); flex-wrap: wrap; margin-bottom: var(--gap-3); align-items: center; justify-content: space-between;
+    }
+    .filters-left { display: flex; gap: var(--gap-2); flex-wrap: wrap; }
+    .input, .select, .btn-primary {
+      height: 36px; padding: 0 12px;
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--bg-elev); color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary {
+      background: var(--brand); color: #fff; border: none; font-weight: 600;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-sm { height: 28px; padding: 0 8px; font-size: 12px; border-radius: 6px; }
+    .btn-danger { background: var(--danger); color: white; border: none; }
+
+    .skeleton {
+      position: relative; overflow: hidden; background: color-mix(in oklab, var(--surface) 70%, var(--border));
+    }
+    .skeleton::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 45%, transparent 100%);
+      animation: shimmer 1.35s infinite;
+    }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+    .toast {
+      position: fixed; right: 16px; bottom: 16px;
+      display: grid; gap: 8px; z-index: 60;
+    }
+    .toast .msg {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow-2);
+    }
+
+    .kbd { font-family: var(--font-mono); font-size: 12px; padding: 2px 6px; border:1px solid var(--border); border-radius:6px; background: var(--bg-elev); }
+
+    /* Dropdown Menus */
+    .notif-badge {
+      position: absolute; top: -3px; right: -3px;
+      background: var(--danger); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 5px; border-radius: 10px; line-height: 1;
+    }
+    .dropdown {
+      position: absolute; top: 48px; right: 0;
+      width: 320px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow-2); padding: var(--gap-3);
+      display: none; flex-direction: column; gap: var(--gap-2);
+      z-index: 50;
+    }
+    .dropdown.show { display: flex; }
+    .dropdown-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .dropdown-list { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .dropdown-item { padding: 8px; border-radius: 8px; background: var(--bg-elev); font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+    .dropdown-item:hover { background: color-mix(in oklab, var(--surface) 80%, var(--accent)); }
+
+    /* Command Palette & Modals */
+    .cmd-overlay, .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: none; place-items: center; z-index: 50;
+    }
+    .cmd, .modal {
+      width: min(600px, 92vw);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-2);
+      padding: var(--gap-4);
+    }
+    .cmd .search { width: 100%; margin-bottom: var(--gap-2); }
+    .cmd .items { max-height: 320px; overflow: auto; display: grid; gap: 6px; }
+    .cmd .item {
+      padding: 8px 10px; border-radius: 8px; border:1px solid transparent;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .cmd .item[aria-selected="true"], .cmd .item:hover {
+      background: color-mix(in oklab, var(--surface) 80%, var(--brand));
+      border-color: color-mix(in oklab, var(--border) 60%, var(--brand));
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .form-group label { font-size: 13px; color: var(--muted); }
+    .form-actions { display: flex; justify-content: flex-end; gap: var(--gap-2); margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <!-- SVG Sprite -->
+  <svg style="display:none">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 9 16.5c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9 15a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path fill="currentColor" d="M12 22a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2Z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5a5 5 0 0 0 5 5Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><path fill="currentColor" d="M6.76 4.84l-1.8-1.79L3.17 4.84l1.79 1.8l1.8-1.8Zm10.48 0l1.8-1.79l1.79 1.79l-1.79 1.8l-1.8-1.8ZM12 4V2h-0v2h0Zm8 8h2v0h-2v0ZM12 22h0v-2h0v2ZM2 12H0v0h2v0Zm3.64 6.36l-1.8 1.8l1.8 1.79l1.79-1.79l-1.79-1.8ZM20.36 18.36l1.8 1.8l-1.8 1.79l-1.79-1.79l1.79-1.8ZM12 8a4 4 0 1 1 0 8a4 4 0 0 1 0-8Z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path fill="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path fill="currentColor" d="M8.12 9.29L12 13.17l3.88-3.88L17.3 10.7L12 16l-5.3-5.3Z"/></symbol>
+  </svg>
+
+  <div class="app" id="app">
+    <!-- Topbar -->
+    <header class="topbar" role="banner">
+      <div class="brand" aria-label="PortalX">
+        <button class="icon-btn" id="menuToggle" aria-label="Menüyü aç/kapat">
+          <svg width="20" height="20"><use href="#i-menu" /></svg>
+        </button>
+        <span>PortalX</span>
+        <span class="kbd">Ctrl/Cmd + K</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="searchBtn" aria-label="Komut paleti">
+          <svg width="20" height="20"><use href="#i-search" /></svg>
+        </button>
+        <button class="icon-btn" id="themeToggle" aria-label="Tema değiştir" aria-pressed="false">
+          <svg width="20" height="20"><use id="themeIcon" href="#i-moon" /></svg>
+        </button>
+        
+        <!-- Notification Dropdown Parent -->
+        <button class="icon-btn" id="notifBtn" aria-label="Bildirimler">
+          <svg width="20" height="20"><use href="#i-bell" /></svg>
+          <span class="notif-badge" id="notifBadge">3</span>
+        </button>
+        <div class="dropdown" id="notifDropdown">
+          <div class="dropdown-header">
+            <strong>Bildirimler</strong>
+            <button class="btn-sm" id="clearNotifs">Tümünü Temizle</button>
+          </div>
+          <div class="dropdown-list" id="notifList"></div>
+        </div>
+
+        <!-- User Dropdown Parent -->
+        <button class="icon-btn" id="userBtn" aria-label="Kullanıcı menüsü">
+          <svg width="20" height="20"><use href="#i-user" /></svg>
+        </button>
+        <div class="dropdown" id="userDropdown">
+          <div class="dropdown-header">
+            <div>
+              <strong>Bora Aksoy</strong>
+              <div style="font-size: 11px; color: var(--muted)">bora@portalx.dev (Admin)</div>
+            </div>
+          </div>
+          <div class="dropdown-list">
+            <div class="dropdown-item" id="btnProfileModal" style="cursor:pointer">👤 Profilimi Görüntüle</div>
+            <div class="dropdown-item" id="btnStatusToggle" style="cursor:pointer">🟢 Durum: Çevrimiçi</div>
+            <div class="dropdown-item" id="btnLogout" style="cursor:pointer; color: var(--danger)">🚪 Oturumu Kapat</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Ana menü">
+      <div class="section-label">Genel</div>
+      <nav class="nav" id="mainNav">
+        <a href="#" data-view="dashboard" aria-current="page"><svg width="18" height="18"><use href="#i-chevron" /></svg><span class="label">Gösterge Paneli</span></a>
+        <a href="#" data-view="projects"><svg width="18" height="18"><use href="#i-chevron" /></svg><span class="label">Projeler</span></a>
+        <a href="#" data-view="reports"><svg width="18" height="18"><use href="#i-chevron" /></svg><span class="label">Raporlar</span></a>
+      </nav>
+      <div class="section-label">Yönetim</div>
+      <nav class="nav">
+        <a href="#" data-view="users"><svg width="18" height="18"><use href="#i-chevron" /></svg><span class="label">Kullanıcılar</span></a>
+        <a href="#" data-view="settings"><svg width="18" height="18"><use href="#i-chevron" /></svg><span class="label">Ayarlar</span></a>
+      </nav>
+      <button class="collapse-toggle" id="collapseSidebar">
+        <svg width="18" height="18"><use href="#i-chevron" /></svg>
+        <span class="label">Menüyü Daralt</span>
+      </button>
+    </aside>
+
+    <!-- Main -->
+    <main class="main" role="main">
+      <div class="content" id="mainContent">
+        <!-- Dynamic content view will render here based on Active Nav -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast" aria-live="polite" aria-atomic="true" id="toast"></div>
+
+  <!-- Command Palette -->
+  <div class="cmd-overlay" id="cmdOverlay" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="cmd" role="group" aria-label="Komut paleti">
+      <input class="input search" id="cmdSearch" type="search" placeholder="Komut ara… örn: tema, ekle, raporlar" aria-label="Komut arama">
+      <div class="items" id="cmdItems"></div>
+    </div>
+  </div>
+
+  <!-- Add/Edit User Modal -->
+  <div class="modal-overlay" id="userModalOverlay">
+    <div class="modal">
+      <h3 id="modalTitle" style="margin:0">Yeni Kullanıcı Ekle</h3>
+      <form id="userForm">
+        <input type="hidden" id="editUserId" value="" />
+        <div class="form-group">
+          <label>Ad Soyad</label>
+          <input class="input" id="userName" required placeholder="Örn: Ahmet Yılmaz" />
+        </div>
+        <div class="form-group">
+          <label>E-posta</label>
+          <input class="input" id="userEmail" type="email" required placeholder="ahmet@portalx.dev" />
+        </div>
+        <div class="form-group">
+          <label>Rol</label>
+          <select class="select" id="userRole">
+            <option>Admin</option>
+            <option>Editor</option>
+            <option selected>Viewer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Durum</label>
+          <select class="select" id="userStatus">
+            <option selected>Aktif</option>
+            <option>Askıda</option>
+            <option>Pasif</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="input" id="closeUserModal">İptal</button>
+          <button type="submit" class="btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Profile View Modal -->
+  <div class="modal-overlay" id="profileModalOverlay">
+    <div class="modal">
+      <h3 style="margin:0">Kullanıcı Profili</h3>
+      <div style="display:flex; align-items:center; gap: 16px; margin: 12px 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--brand); display:grid; place-items:center; font-weight:bold; font-size: 20px;">BA</div>
+        <div>
+          <div style="font-size: 18px; font-weight: bold;">Bora Aksoy</div>
+          <div style="color: var(--muted)">Sistem Yöneticisi (Admin)</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; display:grid; gap: 6px;">
+        <div><strong>E-posta:</strong> bora@portalx.dev</div>
+        <div><strong>Son Giriş:</strong> Bugün, 12:45</div>
+        <div><strong>Yetki Alanı:</strong> Tam Erişim</div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="input" id="closeProfileModal">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========= Bus & Store =========
+    const bus = {
+      events: new Map(),
+      on(evt, fn){ (this.events.get(evt) ?? this.events.set(evt, new Set()).get(evt)).add(fn); },
+      off(evt, fn){ this.events.get(evt)?.delete(fn); },
+      emit(evt, data){ this.events.get(evt)?.forEach(fn => fn(data)); }
+    };
+    const store = {
+      state: {
+        theme: localStorage.getItem("theme") || "dark",
+        sidebarCollapsed: false,
+        activeView: "dashboard",
+        users: [
+          { id: 1, name: "Bora Aksoy", email: "bora@portalx.dev", role: "Admin", status: "Aktif" },
+          { id: 2, name: "Derya Yılmaz", email: "derya@portalx.dev", role: "Editor", status: "Askıda" },
+          { id: 3, name: "Efe Demir", email: "efe@portalx.dev", role: "Viewer", status: "Aktif" },
+          { id: 4, name: "Gül Öz", email: "gul@portalx.dev", role: "Admin", status: "Aktif" },
+          { id: 5, name: "Hale Uçar", email: "hale@portalx.dev", role: "Editor", status: "Pasif" },
+          { id: 6, name: "İlker Kaya", email: "ilker@portalx.dev", role: "Viewer", status: "Aktif" },
+          { id: 7, name: "Jale Gün", email: "jale@portalx.dev", role: "Admin", status: "Askıda" },
+        ],
+        notifications: [
+          { id: 1, text: "Yeni kullanıcı kaydoldu", time: "10 dk önce" },
+          { id: 2, text: "Sistem bakımı 20:00'de", time: "1 saat önce" },
+          { id: 3, text: "Aylık Rapor hazırlandı", time: "2 saat önce" }
+        ],
+        sortKey: null,
+        sortAsc: true
+      },
+      set(key, val){ this.state[key] = val; bus.emit("state:"+key, val); }
+    };
+
+    // ========= Theme =========
+    function applyTheme(theme){
+      document.documentElement.classList.toggle("light", theme === "light");
+      document.getElementById("themeIcon").setAttribute("href", theme === "light" ? "#i-sun" : "#i-moon");
+      document.getElementById("themeToggle").setAttribute("aria-pressed", theme === "light");
+    }
+    function setTheme(next){
+      store.set("theme", next);
+      localStorage.setItem("theme", next);
+      applyTheme(next);
+      toast(`Tema: ${next === "light" ? "Işık" : "Karanlık"}`);
+    }
+
+    // ========= Toast =========
+    function toast(msg, timeout = 2500){
+      const t = document.createElement("div");
+      t.className = "msg";
+      t.textContent = msg;
+      document.getElementById("toast").appendChild(t);
+      setTimeout(() => t.remove(), timeout);
+    }
+
+    // ========= Sidebar =========
+    function setSidebar(collapsed){
+      const sidebar = document.getElementById("sidebar");
+      sidebar.style.display = collapsed ? "none" : "flex";
+      toast(collapsed ? "Menü gizlendi" : "Menü gösterildi");
+      store.set("sidebarCollapsed", collapsed);
+    }
+
+    // ========= Notifications Dropdown & Badge =========
+    function renderNotifications(){
+      const list = document.getElementById("notifList");
+      const badge = document.getElementById("notifBadge");
+      const notifs = store.state.notifications;
+      
+      badge.textContent = notifs.length;
+      badge.style.display = notifs.length > 0 ? "inline-block" : "none";
+
+      if(notifs.length === 0){
+        list.innerHTML = `<div style="text-align:center; padding:12px; color:var(--muted)">Bildirim bulunmuyor</div>`;
+        return;
+      }
+      list.innerHTML = notifs.map(n => `
+        <div class="dropdown-item">
+          <span>${n.text}</span>
+          <span style="font-size:10px; color:var(--muted)">${n.time}</span>
+        </div>
+      `).join("");
+    }
+
+    // ========= View Renderer =========
+    function renderView(viewName){
+      store.state.activeView = viewName;
+      document.querySelectorAll(".nav a").forEach(a => {
+        if(a.getAttribute("data-view") === viewName) {
+          a.setAttribute("aria-current", "page");
+        } else {
+          a.removeAttribute("aria-current");
+        }
+      });
+
+      const container = document.getElementById("mainContent");
+
+      if(viewName === "dashboard" || viewName === "users"){
+        container.innerHTML = `
+          <section class="cards-grid" aria-label="Durum kartları">
+            <div class="card col-4">
+              <div class="card-title"><strong>Aktif Kullanıcılar</strong><span class="trend">+3.2% bu hafta</span></div>
+              <div class="stat"><div class="value" id="usersStat">${store.state.users.length}</div><span class="muted">son güncelleme: <span id="usersUpdated">${new Date().toLocaleTimeString('tr-TR')}</span></span></div>
+            </div>
+            <div class="card col-4">
+              <div class="card-title"><strong>Gelir</strong><span class="trend">+₺12.4K</span></div>
+              <div class="stat"><div class="value">₺84,200</div><span class="muted">aylık</span></div>
+            </div>
+            <div class="card col-4" id="loadingCard">
+              <div class="card-title"><strong>Dönüşüm Oranı</strong><span class="trend">+0.8%</span></div>
+              <div class="stat"><div class="value">4.7%</div><span class="muted">son 30 gün</span></div>
+            </div>
+          </section>
+
+          <section class="cards-grid">
+            <div class="card col-6">
+              <div class="card-title"><strong>Son Haberler</strong><span class="trend" id="newsUpdated">Güncel</span></div>
+              <ul>
+                <li>PortalX v2.0 tam işlevsel sürümüyle yayında.</li>
+                <li>Küresel teknoloji pazarlarında pozitif ivme kazanıldı.</li>
+                <li>Sistem altyapısı hız optimizasyonları tamamlandı.</li>
+              </ul>
+            </div>
+            <div class="card col-6">
+              <div class="card-title"><strong>Döviz Kurlarını Güncelle</strong><span class="trend">Piyasa</span></div>
+              <ul>
+                <li>USD/TRY: 32.10</li>
+                <li>EUR/TRY: 35.20</li>
+                <li>GBP/TRY: 41.50</li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="card col-12">
+            <div class="card-title">
+              <strong>Kullanıcı Yönetimi Veri Tablosu</strong>
+              <div><span class="kbd">F</span> ile filtrele</div>
+            </div>
+            <div class="filters">
+              <div class="filters-left">
+                <input class="input" id="filterInput" type="search" placeholder="Ara: kullanıcı, rol..." />
+                <select class="select" id="roleSelect">
+                  <option value="">Tüm Rollerin Hepsi</option>
+                  <option>Admin</option>
+                  <option>Editor</option>
+                  <option>Viewer</option>
+                </select>
+              </div>
+              <button class="btn-primary" id="openAddUserModal">+ Yeni Kullanıcı</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th onclick="sortTable('name')">Ad ↕</th>
+                    <th onclick="sortTable('email')">E-posta ↕</th>
+                    <th onclick="sortTable('role')">Rol ↕</th>
+                    <th onclick="sortTable('status')">Durum ↕</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody id="dataRows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card col-12">
+            <div class="card-title"><strong>Kısayollar & İpuçları</strong></div>
+            <ul>
+              <li><span class="kbd">Ctrl/Cmd + K</span> komut paletini açar.</li>
+              <li><span class="kbd">F</span> tuşu filtre alanına odaklanır.</li>
+              <li>Tablo başlıklarına tıklayarak kolon bazlı sıralama yapabilirsiniz.</li>
+            </ul>
+          </section>
+        `;
+        renderTableRows();
+        attachTableEvents();
+      } else if(viewName === "projects"){
+        container.innerHTML = `
+          <div class="card col-12">
+            <h2>Aktif Projeler Paneli</h2>
+            <p style="color:var(--muted)">Sisteminizde yürütülen güncel projelerin listesi ve ilerleme durumları.</p>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top:16px;">
+              <div style="padding: 16px; background:var(--bg-elev); border-radius:10px; border:1px solid var(--border)">
+                <strong>PortalX Redesign</strong>
+                <p style="font-size:12px; color:var(--muted)">İlerleme: %85</p>
+              </div>
+              <div style="padding: 16px; background:var(--bg-elev); border-radius:10px; border:1px solid var(--border)">
+                <strong>Mobil Uygulama API</strong>
+                <p style="font-size:12px; color:var(--muted)">İlerleme: %40</p>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if(viewName === "reports"){
+        container.innerHTML = `
+          <div class="card col-12">
+            <h2>Raporlar & Analizler</h2>
+            <p style="color:var(--muted)">Aylık ve haftalık veri analiz raporlarınızı buradan indirebilir veya inceleyebilirsiniz.</p>
+            <button class="btn-primary" style="margin-top:12px" onclick="toast('Rapor PDF olarak indirildi!')">📄 PDF Raporu Oluştur</button>
+          </div>
+        `;
+      } else if(viewName === "settings"){
+        container.innerHTML = `
+          <div class="card col-12">
+            <h2>Sistem Ayarları</h2>
+            <p style="color:var(--muted)">Portal genel yapılandırma seçenekleri.</p>
+            <div style="display:flex; flex-direction:column; gap:12px; max-width:400px; margin-top:16px;">
+              <label><input type="checkbox" checked /> E-posta Bildirimlerini Gönder</label>
+              <label><input type="checkbox" checked /> Otomatik Güncellemeleri Aç</label>
+              <button class="btn-primary" onclick="toast('Ayarlar kaydedildi')">Kaydet</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // ========= Table & Sorting & Actions =========
+    function sortTable(key){
+      if(store.state.sortKey === key){
+        store.state.sortAsc = !store.state.sortAsc;
+      } else {
+        store.state.sortKey = key;
+        store.state.sortAsc = true;
+      }
+      store.state.users.sort((a, b) => {
+        let valA = a[key].toLowerCase();
+        let valB = b[key].toLowerCase();
+        if(valA < valB) return store.state.sortAsc ? -1 : 1;
+        if(valA > valB) return store.state.sortAsc ? 1 : -1;
+        return 0;
+      });
+      renderTableRows();
+      toast(`Tablo ${key} kolonuna göre sıralandı`);
+    }
+
+    function renderTableRows(){
+      const tbody = document.getElementById("dataRows");
+      if(!tbody) return;
+      tbody.innerHTML = "";
+
+      const q = (document.getElementById("filterInput")?.value || "").trim().toLowerCase();
+      const role = document.getElementById("roleSelect")?.value || "";
+
+      const filtered = store.state.users.filter(u => {
+        const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.status.toLowerCase().includes(q);
+        const matchRole = !role || u.role === role;
+        return matchQ && matchRole;
+      });
+
+      filtered.forEach(u => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${u.name}</strong></td>
+          <td>${u.email}</td>
+          <td>${u.role}</td>
+          <td><span style="color: ${u.status === 'Aktif' ? 'var(--success)' : u.status === 'Askıda' ? 'var(--brand)' : 'var(--danger)'}">${u.status}</span></td>
+          <td>
+            <button class="btn-sm input" onclick="editUser(${u.id})">Düzenle</button>
+            <button class="btn-sm btn-danger" onclick="deleteUser(${u.id})">Sil</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function attachTableEvents(){
+      document.getElementById("filterInput")?.addEventListener("input", renderTableRows);
+      document.getElementById("roleSelect")?.addEventListener("change", renderTableRows);
+      document.getElementById("openAddUserModal")?.addEventListener("click", () => openUserModal());
+    }
+
+    function openUserModal(user = null){
+      const overlay = document.getElementById("userModalOverlay");
+      overlay.style.display = "grid";
+      if(user){
+        document.getElementById("modalTitle").textContent = "Kullanıcıyı Düzenle";
+        document.getElementById("editUserId").value = user.id;
+        document.getElementById("userName").value = user.name;
+        document.getElementById("userEmail").value = user.email;
+        document.getElementById("userRole").value = user.role;
+        document.getElementById("userStatus").value = user.status;
+      } else {
+        document.getElementById("modalTitle").textContent = "Yeni Kullanıcı Ekle";
+        document.getElementById("userForm").reset();
+        document.getElementById("editUserId").value = "";
+      }
+    }
+
+    function closeUserModal(){
+      document.getElementById("userModalOverlay").style.display = "none";
+    }
+
+    function editUser(id){
+      const u = store.state.users.find(x => x.id === id);
+      if(u) openUserModal(u);
+    }
+
+    function deleteUser(id){
+      if(confirm("Bu kullanıcıyı silmek istediğinize emin misiniz?")){
+        store.state.users = store.state.users.filter(x => x.id !== id);
+        renderTableRows();
+        const statEl = document.getElementById("usersStat");
+        if(statEl) statEl.textContent = store.state.users.length;
+        toast("Kullanıcı silindi");
+      }
+    }
+
+    // ========= Command Palette =========
+    function openCmd(){
+      const overlay = document.getElementById("cmdOverlay");
+      overlay.style.display = "grid";
+      const search = document.getElementById("cmdSearch");
+      search.value = ""; search.focus();
+      listCmd("");
+    }
+    function closeCmd(){ document.getElementById("cmdOverlay").style.display = "none"; }
+
+    function listCmd(q){
+      const commands = [
+        { label: "Sayfa: Gösterge Paneli", run: () => renderView("dashboard") },
+        { label: "Sayfa: Projeler", run: () => renderView("projects") },
+        { label: "Sayfa: Raporlar", run: () => renderView("reports") },
+        { label: "Sayfa: Kullanıcılar", run: () => renderView("users") },
+        { label: "Sayfa: Ayarlar", run: () => renderView("settings") },
+        { label: "Eylem: Yeni Kullanıcı Ekle", run: () => openUserModal() },
+        { label: "Eylem: Bildirimleri Temizle", run: () => { store.state.notifications = []; renderNotifications(); toast("Bildirimler temizlendi"); } },
+        { label: "Tema: Karanlık Yap", run: () => setTheme("dark") },
+        { label: "Tema: Işık Yap", run: () => setTheme("light") }
+      ];
+
+      const list = document.getElementById("cmdItems");
+      list.innerHTML = "";
+      const query = q.trim().toLowerCase();
+      commands.filter(c => !query || c.label.toLowerCase().includes(query)).forEach(item => {
+        const el = document.createElement("div");
+        el.className = "item";
+        el.innerHTML = `<span>${item.label}</span><span class="kbd">Çalıştır</span>`;
+        el.addEventListener("click", () => { closeCmd(); item.run(); });
+        list.appendChild(el);
+      });
+    }
+
+    // ========= Init Application =========
+    (function init(){
+      applyTheme(store.state.theme);
+      renderNotifications();
+      renderView("dashboard");
+
+      // WebSocket Simülasyonu (Aralıklı Yeni Bildirim Gelmesi)
+      setInterval(() => {
+        const msgs = ["Yeni üye kaydoldu", "Sistem yedeklemesi bitti", "Yeni bir güvenlik uyarısı var"];
+        const rand = msgs[Math.floor(Math.random() * msgs.length)];
+        store.state.notifications.unshift({ id: Date.now(), text: rand, time: "Şimdi" });
+        renderNotifications();
+        toast("🔔 " + rand);
+      }, 15000);
+    })();
+
+    // ========= Event Listeners =========
+    // Topbar Toggles
+    document.getElementById("menuToggle").addEventListener("click", () => {
+      const sb = document.getElementById("sidebar");
+      setSidebar(sb.style.display !== "none");
+    });
+    document.getElementById("collapseSidebar").addEventListener("click", () => setSidebar(true));
+
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      setTheme(store.state.theme === "light" ? "dark" : "light");
+    });
+
+    // Dropdowns Toggle
+    document.getElementById("notifBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.getElementById("userDropdown").classList.remove("show");
+      document.getElementById("notifDropdown").classList.toggle("show");
+    });
+
+    document.getElementById("userBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.getElementById("notifDropdown").classList.remove("show");
+      document.getElementById("userDropdown").classList.toggle("show");
+    });
+
+    document.addEventListener("click", () => {
+      document.getElementById("notifDropdown").classList.remove("show");
+      document.getElementById("userDropdown").classList.remove("show");
+    });
+
+    document.getElementById("clearNotifs").addEventListener("click", () => {
+      store.state.notifications = [];
+      renderNotifications();
+      toast("Tüm bildirimler temizlendi");
+    });
+
+    // Profile Dropdown Actions
+    document.getElementById("btnProfileModal").addEventListener("click", () => {
+      document.getElementById("profileModalOverlay").style.display = "grid";
+    });
+    document.getElementById("closeProfileModal").addEventListener("click", () => {
+      document.getElementById("profileModalOverlay").style.display = "none";
+    });
+
+    let userOnline = true;
+    document.getElementById("btnStatusToggle").addEventListener("click", function(){
+      userOnline = !userOnline;
+      this.textContent = userOnline ? "🟢 Durum: Çevrimiçi" : "🔴 Durum: Meşgul";
+      toast(userOnline ? "Durumunuz Çevrimiçi olarak ayarlandı" : "Durumunuz Meşgul olarak ayarlandı");
+    });
+
+    document.getElementById("btnLogout").addEventListener("click", () => {
+      toast("Oturum kapatıldı, yönlendiriliyorsunuz...");
+    });
+
+    // Sidebar Nav Switching
+    document.addEventListener("click", (e) => {
+      const navLink = e.target.closest(".nav a");
+      if(navLink){
+        e.preventDefault();
+        const view = navLink.getAttribute("data-view");
+        if(view) renderView(view);
+      }
+    });
+
+    // Form Submissions
+    document.getElementById("closeUserModal").addEventListener("click", closeUserModal);
+    document.getElementById("userForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const id = document.getElementById("editUserId").value;
+      const name = document.getElementById("userName").value;
+      const email = document.getElementById("userEmail").value;
+      const role = document.getElementById("userRole").value;
+      const status = document.getElementById("userStatus").value;
+
+      if(id){
+        const user = store.state.users.find(x => x.id == id);
+        if(user){ user.name = name; user.email = email; user.role = role; user.status = status; }
+        toast("Kullanıcı güncellendi");
+      } else {
+        store.state.users.push({ id: Date.now(), name, email, role, status });
+        toast("Yeni kullanıcı eklendi");
+      }
+
+      closeUserModal();
+      renderTableRows();
+      const statEl = document.getElementById("usersStat");
+      if(statEl) statEl.textContent = store.state.users.length;
+    });
+
+    // Command Palette Events
+    document.getElementById("searchBtn").addEventListener("click", openCmd);
+    document.getElementById("cmdSearch").addEventListener("input", (e) => listCmd(e.target.value));
+    document.getElementById("cmdOverlay").addEventListener("click", (e) => {
+      if(e.target.id === "cmdOverlay") closeCmd();
+    });
+
+    // Keyboard Shortcuts
+    document.addEventListener("keydown", (e) => {
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k"){
+        e.preventDefault(); openCmd();
+      }
+      if(e.key.toLowerCase() === "f" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)){
+        e.preventDefault();
+        const input = document.getElementById("filterInput");
+        if(input){ input.focus(); input.select(); }
+      }
+      if(e.key === "Escape"){
+        closeCmd();
+        closeUserModal();
+        document.getElementById("profileModalOverlay").style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>

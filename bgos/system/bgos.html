@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BGOS 1.6 - BatuJS Software</title>
+<style>
+body { margin:0; font-family:sans-serif; background-color:#001f4d; overflow:hidden; user-select:none; font-size:14px; }
+#taskbar { position:fixed; bottom:0; left:0; right:0; height:40px; background-color:#003366; color:white; display:flex; align-items:center; justify-content:space-between; padding:0 10px; z-index:99999; }
+#desktop { width:100%; height:calc(100vh - 40px); position:relative; background-color:#001f4d; overflow:hidden; }
+.icon { width:65px; text-align:center; color:white; cursor:pointer; margin:10px; display:inline-block; position:absolute; word-break:break-word; font-size:12px; }
+.icon img { width:48px; height:48px; pointer-events:none; }
+#fileManager { position:fixed; top:50px; left:50%; transform:translateX(-50%); width:400px; height:300px; background:#004080; border:2px solid #0059b3; color:white; display:none; flex-direction:column; padding:10px; z-index:10000; box-shadow:0 4px 15px rgba(0,0,0,0.5); }
+#fileManager button { background:#0066cc; border:none; color:white; padding:5px; cursor:pointer; margin-top:5px; }
+#startMenu { position:fixed; bottom:40px; left:0; width:200px; background:#003366; color:white; display:none; flex-direction:column; padding:10px; border-right:2px solid #0059b3; z-index:100000; box-shadow:2px -2px 10px rgba(0,0,0,0.5); max-height: 400px; overflow-y: auto; }
+#startMenu button { background:#004080; border:none; color:white; padding:6px; margin:2px 0; cursor:pointer; text-align:left; }
+.window { position:absolute; top:100px; left:100px; width:400px; height:300px; background:#004080; border:2px solid #0059b3; color:white; display:flex; flex-direction:column; z-index:10; box-shadow:0 4px 15px rgba(0,0,0,0.3); outline:none; }
+.window-header { background:#0066cc; padding:5px; cursor:move; display:flex; justify-content:space-between; align-items:center; user-select:none; }
+.window-header span { font-weight:bold; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.window-header button { background:#cc0000; border:none; color:white; cursor:pointer; width:24px; height:24px; margin-left:2px; }
+.window-content { flex:1; overflow:hidden; background:#001f4d; display:flex; justify-content:center; align-items:center; padding:5px; flex-direction:column; position:relative; }
+textarea { width:100%; height:100%; background:#001f4d; color:white; border:none; resize:none; padding:5px; box-sizing:border-box; font-family:monospace; outline:none; }
+#contextMenu, #iconContextMenu { position:absolute; background:#003366; border:2px solid #0059b3; color:white; display:none; flex-direction:column; width:190px; z-index:999999; box-shadow:0 0 10px rgba(0,0,0,0.5); }
+#contextMenu button, #iconContextMenu button { background:#004080; border:none; color:white; padding:8px; text-align:left; cursor:pointer; width:100%; }
+#contextMenu button:hover, #iconContextMenu button:hover { background:#0059b3; }
+.taskbar-item { background:#004080; border:1px solid #0059b3; color:white; padding:2px 10px; cursor:pointer; border-radius:3px; white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.taskbar-item:hover { background:#0059b3; }
+</style>
+</head>
+<body>
+
+<div id="desktop"></div>
+
+<div id="taskbar">
+  <button id="startBtn"></button>
+  <div id="taskbar-windows" style="flex:1; display:flex; gap:5px; margin:0 15px; overflow-x:auto;"></div>
+  <div id="clock"></div>
+</div>
+
+<div id="startMenu"></div>
+
+<div id="fileManager">
+  <input type="file" id="fileInput" multiple>
+  <button id="closeFileManager"></button>
+</div>
+
+<div id="contextMenu">
+  <button id="ctxNewFolder">Yeni Klasör</button>
+  <button id="ctxNewText">Yeni Metin Dosyası</button>
+  <button id="ctxNewBpf">Yeni BPF Programı</button>
+  <button id="ctxWallpaper">Duvar Kağıdı Değiştir</button>
+  <button id="ctxResetIcons">Simgeleri Sıfırla</button>
+  <button id="ctxSettings">Ayarlar</button>
+</div>
+
+<div id="iconContextMenu">
+  <button id="ctxIconRun">▶️ Çalıştır / Aç</button>
+  <button id="ctxIconEdit">📝 Not Defteri ile Düzenle</button>
+  <button id="ctxIconDelete">🗑️ Sil</button>
+</div>
+
+<script>
+// --- Core System ---
+const clock=document.getElementById('clock');
+const startTime = Date.now();
+function updateClock(){clock.textContent=new Date().toLocaleTimeString();}
+setInterval(updateClock,1000); updateClock();
+
+const LANGS = {
+  "en": { start:"Start", fileManager:"File Manager", mediaPlayer:"Media Player", toolbox:"Super Toolbox", minigame:"Snake Game", guide:"User Guide", close:"Close", desktopWallpaper:"Change Wallpaper", language:"Language", tr:"Turkish", en:"English", terminal:"Terminal", paint:"Paint App", stopwatch:"Stopwatch", tictactoe:"Tic-Tac-Toe", winamp:"Winamp Player", taskManager:"Task Manager" },
+  "tr": { start:"Başlat", fileManager:"Dosya Yöneticisi", mediaPlayer:"Medya Oynatıcı", toolbox:"Süper Araç Kutusu", minigame:"Yılan Oyunu", guide:"Kullanım Klavuzu", close:"Kapat", desktopWallpaper:"Duvar Kağıdı Değiştir", language:"Dil", tr:"Türkçe", en:"İngilizce", terminal:"Terminal", paint:"Paint / Çizim", stopwatch:"Kronometre", tictactoe:"XOX Oyunu", winamp:"Winamp Müzik Çalar", taskManager:"Görev Yöneticisi" }
+};
+let currentLang = "tr";
+
+function translateUI(){
+  startBtn.textContent = LANGS[currentLang].start;
+  closeFileManager.textContent = LANGS[currentLang].close;
+  startMenu.querySelectorAll('button').forEach(btn=>{
+    const type=btn.dataset.type;
+    if(type) btn.textContent = LANGS[currentLang][type];
+  });
+}
+
+const desktop=document.getElementById('desktop');
+let zIndexCounter = 10; 
+
+// --- Sürüklenebilir Simgeler Desteği & Klasöre Bırakma Mantığı ---
+function makeIconDraggable(icon) {
+  let isDragging = false, startX, startY, initX, initY;
+  icon.addEventListener('mousedown', (e) => {
+    if(e.button !== 0) return;
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    initX = icon.offsetLeft;
+    initY = icon.offsetTop;
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if(isDragging) {
+      icon.style.left = (initX + e.clientX - startX) + 'px';
+      icon.style.top = (initY + e.clientY - startY) + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if(isDragging) {
+      isDragging = false;
+      const elBelow = document.elementFromPoint(e.clientX, e.clientY);
+      const targetFolder = elBelow ? elBelow.closest('.icon') : null;
+      if(targetFolder && targetFolder !== icon && targetFolder.dataset.isFolder === "true") {
+        const iconName = icon.querySelector('div').textContent;
+        targetFolder.folderItems.push({
+          name: iconName,
+          type: icon.dataset.fileType || 'file',
+          bpfContent: icon.bpfContent || '',
+          fileObj: icon.fileObj || null,
+          iconImg: icon.querySelector('img').src
+        });
+        desktop.removeChild(icon);
+        alert(`"${iconName}" dosyası "${targetFolder.querySelector('div').textContent}" klasörüne taşındı.`);
+      }
+    }
+  });
+}
+
+// --- Window Engine ---
+function makeWindowInteractive(win, header, maxBtn, closeBtn, titleText = "Window", onCloseCallback = null) {
+  if(!header.querySelector('.min-btn')) {
+    const minBtn = document.createElement('button');
+    minBtn.className = 'min-btn';
+    minBtn.textContent = '_';
+    minBtn.style.cssText = "background:#004080; border:none; color:white; cursor:pointer; width:24px; height:24px; margin-left:2px;";
+    header.insertBefore(minBtn, maxBtn);
+    minBtn.onclick = () => { win.style.display = 'none'; };
+  }
+
+  win.addEventListener('mousedown', () => { zIndexCounter++; win.style.zIndex = zIndexCounter; });
+
+  let isDragging=false, offsetX, offsetY;
+  header.onmousedown=(e)=>{
+      if(e.target.tagName === 'BUTTON') return;
+      isDragging=true; offsetX=e.clientX-win.offsetLeft; offsetY=e.clientY-win.offsetTop;
+      zIndexCounter++; win.style.zIndex = zIndexCounter;
+  };
+  document.addEventListener('mousemove', (e) => {
+      if(isDragging){win.style.left=(e.clientX-offsetX)+'px'; win.style.top=(e.clientY-offsetY)+'px';}
+  });
+  document.addEventListener('mouseup', () => {isDragging=false;});
+  
+  let isMax=false, prev={left:0,top:0,width:0,height:0};
+  maxBtn.onclick=()=>{
+    if(!isMax){
+        prev={left:win.offsetLeft,top:win.offsetTop,width:win.offsetWidth,height:win.offsetHeight}; 
+        win.style.left='0px'; win.style.top='0px'; win.style.width='100%'; win.style.height='calc(100vh - 40px)'; 
+        isMax=true;
+    } else {
+        win.style.left=prev.left+'px'; win.style.top=prev.top+'px'; win.style.width=prev.width+'px'; win.style.height=prev.height+'px'; 
+        isMax=false;
+    }
+  };
+
+  const taskbarWindows = document.getElementById('taskbar-windows');
+  const tbBtn = document.createElement('button');
+  tbBtn.className = 'taskbar-item'; tbBtn.textContent = titleText;
+  taskbarWindows.appendChild(tbBtn);
+
+  tbBtn.onclick = () => {
+      if(win.style.display === 'none') {
+          win.style.display = 'flex'; zIndexCounter++; win.style.zIndex = zIndexCounter;
+      } else {
+          if(win.style.zIndex == zIndexCounter) { win.style.display = 'none'; } 
+          else { zIndexCounter++; win.style.zIndex = zIndexCounter; win.focus(); }
+      }
+  };
+
+  closeBtn.onclick=()=>{ 
+      desktop.removeChild(win); 
+      taskbarWindows.removeChild(tbBtn); 
+      if(onCloseCallback) onCloseCallback();
+  };
+}
+
+// --- Start Menu & Icons ---
+const fmIcon=document.createElement('div'); fmIcon.className='icon';
+fmIcon.style.left="20px"; fmIcon.style.top="20px"; fmIcon.innerHTML=`<img src="https://img.icons8.com/ios-filled/50/ffffff/file.png"/><div>${LANGS[currentLang].fileManager}</div>`;
+fmIcon.onclick=openFM; desktop.appendChild(fmIcon);
+makeIconDraggable(fmIcon);
+
+const startBtn=document.getElementById('startBtn');
+const startMenu=document.getElementById('startMenu');
+startBtn.onclick=(e)=>{ e.stopPropagation(); startMenu.style.display=startMenu.style.display==='flex'?'none':'flex';};
+function createStartButton(type, onclick){const btn=document.createElement('button'); btn.dataset.type=type; btn.onclick=onclick; btn.textContent=LANGS[currentLang][type]; startMenu.appendChild(btn);}
+
+createStartButton('fileManager', openFM);
+createStartButton('winamp', openWinampPlayer);          // YENİ: v1.6 Winamp Modülü
+createStartButton('taskManager', openTaskManager);      // YENİ: v1.6 Görev Yöneticisi
+createStartButton('mediaPlayer', ()=>openMediaPlayer());
+createStartButton('toolbox', openToolbox);
+createStartButton('minigame', openMiniGame);
+createStartButton('terminal', openTerminal);
+createStartButton('paint', openPaint);
+createStartButton('stopwatch', openStopwatch);
+createStartButton('tictactoe', openTicTacToe);
+createStartButton('guide', openGuideWindow);
+createStartButton('language', openLanguageWindow);
+
+document.addEventListener("click", (e) => {
+    if(e.target !== startBtn && !startMenu.contains(e.target)) startMenu.style.display = "none";
+});
+
+// --- APPS & PROGRAMS ---
+
+// 1. YENİ ÖZELLİK: Winamp Esintili Retro Müzik Çalar
+function openWinampPlayer() {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="WINAMP - BGOS Edition";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content"; 
+  content.style.cssText = "background:#222; color:#00ff00; font-family:monospace; padding:10px; justify-content:space-between; align-items:stretch;";
+
+  const screen = document.createElement("div");
+  screen.style.cssText = "background:#000; border:2px inset #555; padding:8px; height:60px; display:flex; flex-direction:column; justify-content:center;";
+  screen.innerHTML = `<div style="font-size:12px; color:#ffcc00;">BGOS Audio Stream v1.6</div><div id="trackInfo" style="font-size:14px; font-weight:bold; margin-top:4px;">Seçili Parça Yok</div>`;
+
+  // Sahte Ekran Görselleştirici Çubukları (Visualizer)
+  const visualizer = document.createElement("div");
+  visualizer.style.cssText = "display:flex; gap:2px; height:40px; background:#111; align-items:flex-end; padding:2px; border:1px solid #444;";
+  let bars = [];
+  for(let i=0; i<20; i++) {
+    const bar = document.createElement("div");
+    bar.style.cssText = "flex:1; background:#00ff00; height:10%; transition:height 0.1s;";
+    visualizer.appendChild(bar);
+    bars.push(bar);
+  }
+
+  let visInterval = setInterval(() => {
+    bars.forEach(b => b.style.height = Math.floor(Math.random() * 95 + 5) + "%");
+  }, 120);
+
+  const controls = document.createElement("div");
+  controls.style.cssText = "display:flex; gap:5px; justify-content:center; margin-top:5px;";
+  
+  const playBtn = document.createElement("button"); playBtn.textContent = "▶️ Oynat";
+  const stopBtn = document.createElement("button"); stopBtn.textContent = "⏹️ Durdur";
+  [playBtn, stopBtn].forEach(b => b.style.cssText = "background:#333; color:#00ff00; border:1px solid #555; padding:5px 10px; cursor:pointer; font-family:monospace;");
+
+  const audioElem = document.createElement("audio");
+  audioElem.loop = true;
+
+  playBtn.onclick = () => {
+    const picker = document.createElement("input"); picker.type = "file"; picker.accept = "audio/*";
+    picker.onchange = (e) => {
+      const file = e.target.files[0];
+      if(file) {
+        audioElem.src = URL.createObjectURL(file);
+        audioElem.play();
+        content.querySelector("#trackInfo").textContent = file.name;
+      }
+    };
+    picker.click();
+  };
+
+  stopBtn.onclick = () => {
+    audioElem.pause();
+    content.querySelector("#trackInfo").textContent = "Durduruldu";
+  };
+
+  controls.appendChild(playBtn); controls.appendChild(stopBtn);
+  content.appendChild(screen);
+  content.appendChild(visualizer);
+  content.appendChild(controls);
+
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  win.style.width = '300px'; win.style.height = '240px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Winamp Müzik Çalar", () => {
+    clearInterval(visInterval);
+    audioElem.pause();
+  });
+}
+
+// 2. YENİ ÖZELLİK: Klasik Görev Yöneticisi (Task Manager)
+function openTaskManager() {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="Görev Yöneticisi";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content";
+  content.style.cssText = "background:#f0f0f0; color:#000; padding:10px; justify-content:flex-start; align-items:stretch;";
+
+  const infoBox = document.createElement("div");
+  infoBox.style.cssText = "font-size:12px; margin-bottom:10px; background:#fff; padding:5px; border:1px solid #ccc;";
+  infoBox.innerHTML = `<b>CPU Kullanımı:</b> <span id="cpuVal">12</span>% | <b>RAM:</b> 410 MB / 1024 MB`;
+
+  const listContainer = document.createElement("div");
+  listContainer.style.cssText = "flex:1; background:#fff; border:1px solid #ccc; overflow-y:auto; padding:5px;";
+  
+  const refreshList = () => {
+    listContainer.innerHTML = "";
+    const activeWindows = desktop.querySelectorAll('.window');
+    if(activeWindows.length === 0) {
+      listContainer.innerHTML = "<div style='padding:5px; color:#666;'>Çalışan aktif pencere yok.</div>";
+      return;
+    }
+    activeWindows.forEach((w) => {
+      const winTitle = w.querySelector('.window-header span').textContent;
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:4px; border-bottom:1px solid #eee; font-size:13px;";
+      row.innerHTML = `<span>${winTitle}</span>`;
+      
+      const killBtn = document.createElement("button");
+      killBtn.textContent = "Görevi Sonlandır";
+      killBtn.style.cssText = "background:#cc0000; color:white; border:none; padding:2px 6px; cursor:pointer; font-size:11px;";
+      killBtn.onclick = () => {
+        desktop.removeChild(w);
+        // İlgili taskbar butonunu da temizle
+        const tbTitle = winTitle;
+        document.querySelectorAll('.taskbar-item').forEach(tb => {
+          if(tb.textContent === tbTitle) tb.remove();
+        });
+        refreshList();
+      };
+      row.appendChild(killBtn);
+      listContainer.appendChild(row);
+    });
+  };
+
+  const refreshBtn = document.createElement("button");
+  refreshBtn.textContent = "Listeyi Yenile";
+  refreshBtn.style.cssText = "margin-top:8px; padding:5px; background:#0066cc; color:white; border:none; cursor:pointer; width:100%; font-weight:bold;";
+  refreshBtn.onclick = refreshList;
+
+  content.appendChild(infoBox);
+  content.appendChild(listContainer);
+  content.appendChild(refreshBtn);
+
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  refreshList();
+
+  win.style.width = '350px'; win.style.height = '280px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Görev Yöneticisi");
+}
+
+// 3. Calculator Program
+function openCalculator() {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="Hesap Makinesi";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content"; content.style.backgroundColor="#ececec"; content.style.padding="10px";
+  
+  const display = document.createElement("input");
+  display.type = "text"; display.readOnly = true; 
+  display.style.cssText = "width:100%; height:40px; font-size:24px; text-align:right; margin-bottom:10px; border:1px solid #ccc; background:#fff; color:#000;";
+  content.appendChild(display);
+
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; width:100%; height:100%;";
+  
+  const buttons = ['7','8','9','/','4','5','6','*','1','2','3','-','C','0','=','+'];
+
+  buttons.forEach(btnText => {
+      const btn = document.createElement("button");
+      btn.textContent = btnText;
+      btn.style.cssText = "font-size:18px; border:1px solid #999; background:#e0e0e0; cursor:pointer; outline:none;";
+      btn.onmouseover = () => btn.style.background = "#d0d0d0";
+      btn.onmouseout = () => btn.style.background = "#e0e0e0";
+      
+      if(btnText === 'C') {
+          btn.onclick = () => display.value = "";
+      } else if (btnText === '=') {
+          btn.onclick = () => {
+              try { display.value = Function("return " + display.value)(); } 
+              catch { display.value = "Hata"; }
+          };
+      } else {
+          btn.onclick = () => {
+              if(display.value === "Hata") display.value = "";
+              display.value += btnText;
+          };
+      }
+      grid.appendChild(btn);
+  });
+  
+  content.appendChild(grid);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  
+  win.style.width='250px'; win.style.height='300px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Hesap Makinesi");
+}
+
+// 4. Notepad Program
+function openNotepad(initialContent = "", onSaveCallback = null) {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="Not Defteri";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content"; content.style.padding="0";
+  
+  const toolbar = document.createElement("div");
+  toolbar.style.cssText = "width:100%; background:#f0f0f0; border-bottom:1px solid #ccc; padding:2px; display:flex; gap:5px;";
+  
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "💾 Kaydet";
+  saveBtn.style.cssText = "background:transparent; border:none; cursor:pointer; padding:5px; font-weight:bold;";
+  
+  const clearBtn = document.createElement("button");
+  clearBtn.textContent = "🗑️ Temizle";
+  clearBtn.style.cssText = "background:transparent; border:none; cursor:pointer; padding:5px;";
+  
+  toolbar.appendChild(saveBtn); toolbar.appendChild(clearBtn);
+  
+  const ta = document.createElement("textarea");
+  ta.style.cssText = "flex:1; width:100%; background:#fff; color:#000; font-family:monospace; padding:10px; border:none; resize:none; outline:none;";
+  ta.value = initialContent;
+  
+  saveBtn.onclick = () => {
+      if(onSaveCallback) {
+          onSaveCallback(ta.value);
+          alert("Dosya başarıyla güncellendi!");
+      } else {
+          const blob = new Blob([ta.value], { type: "text/plain" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "Yeni_Not.txt";
+          a.click();
+      }
+  };
+  
+  clearBtn.onclick = () => ta.value = "";
+
+  content.appendChild(toolbar);
+  content.appendChild(ta);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  
+  win.style.width = '550px'; win.style.height = '400px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Not Defteri");
+}
+
+// 5. Super Toolbox Launcher
+function openToolbox(){
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent=LANGS[currentLang].toolbox;
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content"; 
+  
+  const innerHTML = document.createElement("div");
+  innerHTML.style.cssText = "width:100%; height:100%; padding:15px; box-sizing:border-box; color:white; overflow-y:auto;";
+  innerHTML.innerHTML = `<h3>Sistem Araçları</h3>`;
+  
+  const btnContainer = document.createElement("div");
+  btnContainer.style.cssText = "display:flex; gap:10px; flex-wrap:wrap;";
+  
+  const createToolBtn = (icon, text, onClick) => {
+    const btn = document.createElement("button");
+    btn.innerHTML = `${icon}<br>${text}`;
+    btn.style.cssText = "padding:10px; background:#0066cc; color:white; border:none; cursor:pointer; border-radius:5px; width:110px; height:75px; font-size:13px;";
+    btn.onclick = onClick;
+    return btn;
+  };
+
+  btnContainer.appendChild(createToolBtn("🖩", "Hesap Makinesi", openCalculator));
+  btnContainer.appendChild(createToolBtn("📝", "Not Defteri", () => openNotepad()));
+  btnContainer.appendChild(createToolBtn("⚡", "Winamp", openWinampPlayer));
+  btnContainer.appendChild(createToolBtn("📊", "Görev Yön.", openTaskManager));
+  btnContainer.appendChild(createToolBtn("💻", "Terminal", openTerminal));
+  btnContainer.appendChild(createToolBtn("🎨", "Paint App", openPaint));
+
+  const footer = document.createElement("p");
+  footer.style.cssText = "color:#aaa; font-size:12px; margin-top:25px; border-top:1px solid #0059b3; padding-top:10px;";
+  footer.textContent = "BatuJS Software tarafından geliştirildi.";
+
+  innerHTML.appendChild(btnContainer);
+  innerHTML.appendChild(footer);
+  
+  content.appendChild(innerHTML);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, LANGS[currentLang].toolbox);
+}
+
+// 6. Snake Mini Game
+function openMiniGame(){
+  const win=document.createElement("div"); win.className="window"; win.tabIndex = 1; 
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent=LANGS[currentLang].minigame;
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  const content=document.createElement("div"); content.className="window-content"; content.style.padding = "0";
+  
+  const canvas = document.createElement("canvas");
+  canvas.width = 396; canvas.height = 266; canvas.style.background = "#000"; canvas.style.display="block";
+  content.appendChild(canvas);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  
+  const ctx = canvas.getContext("2d");
+  const grid = 14;
+  let count = 0, score = 0;
+  let snake = { x: 140, y: 140, dx: grid, dy: 0, cells: [], maxCells: 4 };
+  let apple = { x: 280, y: 140 };
+  let gameLoop;
+
+  function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
+  
+  function resetGame() {
+    snake.x = 140; snake.y = 140; snake.cells = []; snake.maxCells = 4; snake.dx = grid; snake.dy = 0;
+    score = 0;
+    apple.x = getRandomInt(0, 25) * grid; apple.y = getRandomInt(0, 18) * grid;
+  }
+
+  function loop() {
+    gameLoop = requestAnimationFrame(loop);
+    if (++count < 6) return; 
+    count = 0;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    snake.x += snake.dx; snake.y += snake.dy;
+    if (snake.x < 0) snake.x = canvas.width - grid;
+    else if (snake.x >= canvas.width) snake.x = 0;
+    if (snake.y < 0) snake.y = canvas.height - grid;
+    else if (snake.y >= canvas.height) snake.y = 0;
+
+    snake.cells.unshift({x: snake.x, y: snake.y});
+    if (snake.cells.length > snake.maxCells) snake.cells.pop();
+
+    ctx.fillStyle = 'red'; ctx.fillRect(apple.x, apple.y, grid-1, grid-1);
+
+    ctx.fillStyle = 'lime';
+    snake.cells.forEach(function(cell, index) {
+      ctx.fillRect(cell.x, cell.y, grid-1, grid-1);
+      if (cell.x === apple.x && cell.y === apple.y) {
+        snake.maxCells++; score += 10;
+        apple.x = getRandomInt(0, 25) * grid; apple.y = getRandomInt(0, 18) * grid;
+      }
+      for (let i = index + 1; i < snake.cells.length; i++) {
+        if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) { resetGame(); }
+      }
+    });
+
+    ctx.fillStyle = "white"; ctx.font = "14px Arial"; ctx.fillText("Skor: " + score, 10, 20);
+  }
+
+  win.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft' && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+    else if (e.key === 'ArrowUp' && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+    else if (e.key === 'ArrowRight' && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+    else if (e.key === 'ArrowDown' && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+  });
+
+  gameLoop = requestAnimationFrame(loop);
+  win.focus();
+
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, LANGS[currentLang].minigame, () => {
+      cancelAnimationFrame(gameLoop);
+  });
+}
+
+// 7. Terminal Program
+function openTerminal(){
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="BGOS Terminal";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content"; 
+  content.style.cssText = "background:#000; color:#00ff00; font-family:monospace; padding:10px; display:flex; flex-direction:column; justify-content:flex-start; align-items:flex-start;";
+  
+  const output = document.createElement("div");
+  output.style.cssText = "width:100%; flex:1; overflow-y:auto; white-space:pre-wrap; font-size:13px;";
+  output.innerHTML = "BGOS Command Prompt [Version 1.6.0]\nType 'help' for available commands.\n\n";
+
+  const inputRow = document.createElement("div");
+  inputRow.style.cssText = "display:flex; width:100%; margin-top:5px;";
+
+  const promptSpan = document.createElement("span"); promptSpan.textContent = "BGOS> "; promptSpan.style.color = "#00ff00";
+  const termInput = document.createElement("input");
+  termInput.type = "text";
+  termInput.style.cssText = "flex:1; background:transparent; border:none; color:#00ff00; font-family:monospace; outline:none; font-size:13px;";
+
+  inputRow.appendChild(promptSpan); inputRow.appendChild(termInput);
+  content.appendChild(output); content.appendChild(inputRow);
+
+  termInput.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") {
+      const cmd = termInput.value.trim().toLowerCase();
+      output.innerHTML += `BGOS> ${termInput.value}\n`;
+      termInput.value = "";
+
+      if(cmd === "help") {
+        output.innerHTML += "Available commands:\n - help: Shows commands\n - ver: Version info\n - cls: Clear screen\n - date: Show date\n - calc: Open Calc\n - paint: Open Paint\n - winamp: Open Winamp\n - taskmgr: Open Task Manager\n - echo [text]: Prints text\n\n";
+      } else if(cmd === "ver") {
+        output.innerHTML += "BGOS Version 1.6.0 (BatuJS Software)\n\n";
+      } else if(cmd === "cls") { output.innerHTML = ""; }
+      else if(cmd === "date") { output.innerHTML += `${new Date().toLocaleString()}\n\n`; }
+      else if(cmd === "calc") { openCalculator(); output.innerHTML += "Calculator launched.\n\n"; }
+      else if(cmd === "paint") { openPaint(); output.innerHTML += "Paint launched.\n\n"; }
+      else if(cmd === "winamp") { openWinampPlayer(); output.innerHTML += "Winamp launched.\n\n"; }
+      else if(cmd === "taskmgr") { openTaskManager(); output.innerHTML += "Task Manager launched.\n\n"; }
+      else if(cmd.startsWith("echo ")) { output.innerHTML += `${cmd.substring(5)}\n\n`; }
+      else if(cmd !== "") { output.innerHTML += `'${cmd}' is not recognized as an internal command.\n\n`; }
+      output.scrollTop = output.scrollHeight;
+    }
+  });
+
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  win.style.width = '500px'; win.style.height = '320px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Terminal");
+  setTimeout(() => termInput.focus(), 100);
+}
+
+// 8. Paint App
+function openPaint() {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="Paint / Çizim Programı";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+
+  const content=document.createElement("div"); content.className="window-content"; content.style.padding = "0";
+  
+  const toolbar = document.createElement("div");
+  toolbar.style.cssText = "width:100%; background:#e0e0e0; border-bottom:1px solid #ccc; padding:5px; display:flex; gap:10px; align-items:center;";
+  
+  const colorPicker = document.createElement("input"); colorPicker.type = "color"; colorPicker.value = "#000000";
+  const sizeInput = document.createElement("input"); sizeInput.type = "range"; sizeInput.min = "1"; sizeInput.max = "20"; sizeInput.value = "3"; sizeInput.style.width = "70px";
+  const clearBtn = document.createElement("button"); clearBtn.textContent = "🧹 Temizle";
+  const saveBtn = document.createElement("button"); saveBtn.textContent = "💾 İndir";
+
+  toolbar.appendChild(document.createTextNode("Renk: ")); toolbar.appendChild(colorPicker);
+  toolbar.appendChild(document.createTextNode(" Boyut: ")); toolbar.appendChild(sizeInput);
+  toolbar.appendChild(clearBtn); toolbar.appendChild(saveBtn);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 580; canvas.height = 350; canvas.style.background = "#fff"; canvas.style.cursor = "crosshair";
+  const ctx = canvas.getContext("2d");
+
+  let drawing = false;
+  canvas.onmousedown = (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); };
+  canvas.onmousemove = (e) => {
+    if(drawing) {
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.strokeStyle = colorPicker.value;
+      ctx.lineWidth = sizeInput.value;
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+  };
+  canvas.onmouseup = () => drawing = false;
+  clearBtn.onclick = () => ctx.clearRect(0,0,canvas.width,canvas.height);
+  saveBtn.onclick = () => {
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL(); a.download = "cizim.png"; a.click();
+  };
+
+  content.appendChild(toolbar); content.appendChild(canvas);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  win.style.width = '600px'; win.style.height = '430px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Paint");
+}
+
+// 9. Stopwatch App
+function openStopwatch() {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="Kronometre";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+
+  const content=document.createElement("div"); content.className="window-content";
+  content.style.cssText = "padding:20px; display:flex; flex-direction:column; align-items:center; justify-content:center;";
+
+  const timerDisplay = document.createElement("h1");
+  timerDisplay.textContent = "00:00:00.0"; timerDisplay.style.cssText = "font-size:36px; margin:10px 0; font-family:monospace;";
+
+  const btnContainer = document.createElement("div");
+  btnContainer.style.cssText = "display:flex; gap:10px; margin-bottom:15px;";
+
+  const startBtn = document.createElement("button"); startBtn.textContent = "Başlat";
+  const pauseBtn = document.createElement("button"); pauseBtn.textContent = "Durdur";
+  const resetBtn = document.createElement("button"); resetBtn.textContent = "Sıfırla";
+  [startBtn, pauseBtn, resetBtn].forEach(b => b.style.cssText = "padding:8px 15px; background:#0066cc; color:white; border:none; cursor:pointer; font-weight:bold;");
+
+  let timer = null, elapsed = 0;
+  startBtn.onclick = () => {
+    if(!timer) {
+      const start = Date.now() - elapsed;
+      timer = setInterval(() => {
+        elapsed = Date.now() - start;
+        const ms = Math.floor((elapsed % 1000) / 100);
+        const sec = Math.floor((elapsed / 1000) % 60);
+        const min = Math.floor((elapsed / 60000) % 60);
+        const hrs = Math.floor(elapsed / 3600000);
+        timerDisplay.textContent = `${hrs.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}.${ms}`;
+      }, 100);
+    }
+  };
+  pauseBtn.onclick = () => { clearInterval(timer); timer = null; };
+  resetBtn.onclick = () => { clearInterval(timer); timer = null; elapsed = 0; timerDisplay.textContent = "00:00:00.0"; };
+
+  btnContainer.appendChild(startBtn); btnContainer.appendChild(pauseBtn); btnContainer.appendChild(resetBtn);
+  content.appendChild(timerDisplay); content.appendChild(btnContainer);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  win.style.width = '320px'; win.style.height = '220px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "Kronometre");
+}
+
+// 10. Tic-Tac-Toe Game
+function openTicTacToe() {
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="XOX Oyunu";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+
+  const content=document.createElement("div"); content.className="window-content";
+  content.style.cssText = "padding:15px; display:flex; flex-direction:column; align-items:center;";
+
+  const status = document.createElement("div"); status.textContent = "Sıra: X"; status.style.margin="5px; font-weight:bold;";
+  const grid = document.createElement("div"); grid.style.cssText = "display:grid; grid-template-columns:repeat(3, 70px); gap:5px;";
+
+  let turn = "X", board = ["","","","","","","","",""];
+
+  const checkWinner = () => {
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(let w of wins) {
+      if(board[w[0]] && board[w[0]] === board[w[1]] && board[w[0]] === board[w[2]]) return board[w[0]];
+    }
+    return board.includes("") ? null : "Berabere";
+  };
+
+  const renderBoard = () => {
+    grid.innerHTML = "";
+    board.forEach((val, idx) => {
+      const btn = document.createElement("button");
+      btn.textContent = val; btn.style.cssText = "height:70px; font-size:24px; font-weight:bold; background:#004080; color:white; border:1px solid #0059b3; cursor:pointer;";
+      btn.onclick = () => {
+        if(!val && !checkWinner()) {
+          board[idx] = turn;
+          const winner = checkWinner();
+          if(winner) {
+            status.textContent = winner === "Berabere" ? "Berabere Bitti!" : `Kazanan: ${winner}!`;
+          } else {
+            turn = turn === "X" ? "O" : "X"; status.textContent = `Sıra: ${turn}`;
+          }
+          renderBoard();
+        }
+      };
+      grid.appendChild(btn);
+    });
+  };
+  
+  const resetBtn = document.createElement("button"); resetBtn.textContent = "Yeniden Başlat"; resetBtn.style.cssText = "margin-top:10px; padding:5px 10px; background:#0066cc; color:white; border:none; cursor:pointer;";
+  resetBtn.onclick = () => { turn = "X"; board = ["","","","","","","","",""]; status.textContent = "Sıra: X"; renderBoard(); };
+
+  content.appendChild(status); content.appendChild(grid); content.appendChild(resetBtn);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  renderBoard();
+  win.style.width = '280px'; win.style.height='360px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, "XOX Oyunu");
+}
+
+// --- BPF Engine ---
+function openBpfProgram(htmlContent, titleText){
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent=titleText;
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content"; content.style.padding = "0";
+  const iframe=document.createElement("iframe");
+  iframe.style.width="100%"; iframe.style.height="100%"; iframe.style.border="none"; iframe.style.backgroundColor="#fff";
+  iframe.srcdoc = htmlContent; 
+  
+  content.appendChild(iframe);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  
+  win.style.width='600px'; win.style.height='450px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, titleText);
+}
+
+// --- Standard Windows ---
+function openMediaPlayer(file=null){
+  const win=document.createElement('div'); win.className='window';
+  const header=document.createElement('div'); header.className='window-header';
+  const title=document.createElement('span'); title.textContent=LANGS[currentLang].mediaPlayer;
+  const maxBtn=document.createElement('button'); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement('button'); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  const content=document.createElement('div'); content.className='window-content';
+  if(file){const ext=file.name.split('.').pop().toLowerCase();
+    if(['png','jpg','jpeg','gif'].includes(ext)){const img=document.createElement('img'); img.src=URL.createObjectURL(file); img.style.maxWidth="100%"; img.style.maxHeight="100%"; content.appendChild(img);}
+    else if(['mp4','webm','ogg'].includes(ext)){const video=document.createElement('video'); video.src=URL.createObjectURL(file); video.controls=true; video.style.maxWidth="100%"; content.appendChild(video);}
+    else if(['mp3','wav','ogg'].includes(ext)){const audio=document.createElement('audio'); audio.src=URL.createObjectURL(file); audio.controls=true; content.appendChild(audio);}
+    else{content.textContent="File not supported.";}
+  } else content.textContent="Select a file to play.";
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  zIndexCounter++; win.style.zIndex = zIndexCounter; makeWindowInteractive(win, header, maxBtn, closeBtn, LANGS[currentLang].mediaPlayer);
+}
+
+function openGuideWindow(){
+  const win=document.createElement('div'); win.className='window';
+  const header=document.createElement('div'); header.className='window-header';
+  const title=document.createElement('span'); title.textContent=LANGS[currentLang].guide;
+  const maxBtn=document.createElement('button'); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement('button'); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  const content=document.createElement('div'); content.className='window-content';
+  content.innerHTML=`<div style="width:100%; height:100%; overflow-y:auto; padding:10px; box-sizing:border-box;">
+  <h2 style="margin-top:0;">BGOS 1.6 ${LANGS[currentLang].guide}</h2>
+  <p style="color:#aaa; font-size:12px; border-bottom:1px solid #0059b3; padding-bottom:5px;">Developed by BatuJS Software</p>
+  <ul><li>Start Menu & Taskbar v1.6</li><li>Winamp Retro Müzik Çalar</li><li>Klasik Görev Yöneticisi</li><li>File Manager & BPF App Engine</li><li>Super Toolbox & Mini Games</li></ul></div>`;
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  zIndexCounter++; win.style.zIndex = zIndexCounter; makeWindowInteractive(win, header, maxBtn, closeBtn, LANGS[currentLang].guide);
+}
+
+function openLanguageWindow(){
+  const win=document.createElement('div'); win.className='window';
+  const header=document.createElement('div'); header.className='window-header';
+  const title=document.createElement('span'); title.textContent=LANGS[currentLang].language;
+  const maxBtn=document.createElement('button'); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement('button'); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  const content=document.createElement('div'); content.className='window-content'; content.style.flexDirection='column';
+  const trBtn=document.createElement('button'); trBtn.textContent=LANGS[currentLang].tr; trBtn.style.cssText="background:#0066cc; color:white; border:none; padding:8px 15px; margin:5px; cursor:pointer;"; 
+  trBtn.onclick=()=>{currentLang='tr'; translateUI(); desktop.querySelector('.icon div').textContent=LANGS[currentLang].fileManager;};
+  const enBtn=document.createElement('button'); enBtn.textContent=LANGS[currentLang].en; enBtn.style.cssText="background:#0066cc; color:white; border:none; padding:8px 15px; margin:5px; cursor:pointer;";
+  enBtn.onclick=()=>{currentLang='en'; translateUI(); desktop.querySelector('.icon div').textContent=LANGS[currentLang].fileManager;};
+  content.appendChild(trBtn); content.appendChild(enBtn);
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  zIndexCounter++; win.style.zIndex = zIndexCounter; makeWindowInteractive(win, header, maxBtn, closeBtn, LANGS[currentLang].language);
+}
+
+function openFolderWindow(folderIcon, folderName) {
+  const win=document.createElement('div'); win.className='window';
+  const header=document.createElement('div'); header.className='window-header';
+  const title=document.createElement('span'); title.textContent="Klasör: " + folderName;
+  const maxBtn=document.createElement('button'); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement('button'); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement('div'); content.className='window-content';
+  content.style.cssText = "display:flex; flex-wrap:wrap; align-content:flex-start; padding:10px; background:#002b66; gap:10px;";
+
+  const renderFolderItems = () => {
+    content.innerHTML = "";
+    if(!folderIcon.folderItems || folderIcon.folderItems.length === 0) {
+      content.innerHTML = "<p style='color:#ccc; width:100%; text-align:center;'>Bu klasör boş.</p>";
+      return;
+    }
+    folderIcon.folderItems.forEach((item, index) => {
+      const itemDiv = document.createElement("div");
+      itemDiv.style.cssText = "width:70px; text-align:center; color:white; cursor:pointer; font-size:12px;";
+      itemDiv.innerHTML = `<img src="${item.iconImg}" style="width:40px; height:40px;"/><div style="word-break:break-word;">${item.name}</div>`;
+      
+      itemDiv.ondblclick = () => {
+        if(item.type === 'bpf') {
+          openBpfProgram(item.bpfContent, item.name);
+        } else {
+          openNotepad(item.bpfContent || "", (newVal) => { item.bpfContent = newVal; });
+        }
+      };
+
+      itemDiv.oncontextmenu = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if(confirm(`"${item.name}" dosyasını masaüstüne geri çıkarmak istiyor musunuz?`)) {
+          createIconElement(item.name, item.type, item.bpfContent, item.iconImg);
+          folderIcon.folderItems.splice(index, 1);
+          renderFolderItems();
+        }
+      };
+
+      content.appendChild(itemDiv);
+    });
+  };
+
+  renderFolderItems();
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  win.style.width='450px'; win.style.height='320px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter;
+  makeWindowInteractive(win, header, maxBtn, closeBtn, folderName);
+}
+
+function createIconElement(name, type, bpfContent = "", customImg = null) {
+  const icon = document.createElement("div"); icon.className = "icon";
+  const pos = getNextIconPosition(); icon.style.left = pos.x + "px"; icon.style.top = pos.y + "px";
+  icon.dataset.fileType = type;
+  icon.bpfContent = bpfContent;
+
+  let imgSrc = customImg || "https://img.icons8.com/fluency/48/document.png";
+  if(type === 'bpf') imgSrc = "https://img.icons8.com/fluency/48/application-window.png";
+  if(type === 'folder') imgSrc = "https://img.icons8.com/fluency/48/folder-invoices.png";
+
+  icon.innerHTML = `<img src="${imgSrc}"/><div>${name}</div>`;
+
+  if(type === 'bpf') {
+    icon.ondblclick = () => openBpfProgram(icon.bpfContent, name);
+  } else if(type === 'folder') {
+    icon.dataset.isFolder = "true";
+    icon.folderItems = [];
+    icon.ondblclick = () => openFolderWindow(icon, name);
+  } else {
+    icon.ondblclick = () => openNotepad(icon.bpfContent || "", (newVal) => { icon.bpfContent = newVal; });
+  }
+
+  desktop.appendChild(icon);
+  makeIconDraggable(icon);
+  return icon;
+}
+
+// --- Desktop Logic & Dynamic Context Menus ---
+const fileInput=document.getElementById('fileInput');
+fileInput.onchange=(e)=>{
+  const files=e.target.files;
+  Array.from(files).forEach(file=>{
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(ext === 'bpf') {
+      const reader = new FileReader();
+      reader.onload = (event) => { createIconElement(file.name, 'bpf', event.target.result); };
+      reader.readAsText(file);
+    } else {
+      createIconElement(file.name, 'file', '');
+    }
+  });
+};
+
+const contextMenu=document.getElementById("contextMenu");
+const iconContextMenu=document.getElementById("iconContextMenu");
+let targetIconForContext = null;
+
+desktop.oncontextmenu=(e)=>{
+  e.preventDefault();
+  const clickedIcon = e.target.closest('.icon');
+  
+  if(clickedIcon && clickedIcon !== fmIcon) {
+    targetIconForContext = clickedIcon;
+    contextMenu.style.display = "none";
+    iconContextMenu.style.display = "flex";
+    iconContextMenu.style.left = e.pageX + "px";
+    iconContextMenu.style.top = e.pageY + "px";
+  } else {
+    iconContextMenu.style.display = "none";
+    contextMenu.style.display = "flex";
+    contextMenu.style.left = e.pageX + "px";
+    contextMenu.style.top = e.pageY + "px";
+  }
+};
+
+document.addEventListener("click",(e)=>{ 
+  if(e.button !== 2) {
+    contextMenu.style.display="none";
+    iconContextMenu.style.display="none";
+  }
+});
+
+document.getElementById("ctxIconRun").onclick = () => {
+  if(targetIconForContext) {
+    if(targetIconForContext.dataset.fileType === 'bpf') {
+      openBpfProgram(targetIconForContext.bpfContent, targetIconForContext.querySelector('div').textContent);
+    } else if(targetIconForContext.dataset.isFolder === "true") {
+      openFolderWindow(targetIconForContext, targetIconForContext.querySelector('div').textContent);
+    } else {
+      openNotepad(targetIconForContext.bpfContent || "", (newVal) => { targetIconForContext.bpfContent = newVal; });
+    }
+  }
+};
+
+document.getElementById("ctxIconEdit").onclick = () => {
+  if(targetIconForContext) {
+    openNotepad(targetIconForContext.bpfContent || "", (newContent) => {
+      targetIconForContext.bpfContent = newContent;
+    });
+  }
+};
+
+document.getElementById("ctxIconDelete").onclick = () => {
+  if(targetIconForContext) {
+    desktop.removeChild(targetIconForContext);
+    targetIconForContext = null;
+  }
+};
+
+function getNextIconPosition(){
+  const icons=Array.from(desktop.querySelectorAll(".icon")).filter(i=>i!==fmIcon);
+  const spacingX=80, spacingY=100, startX=100, startY=20, maxWidth=window.innerWidth-spacingX;
+  let x=startX, y=startY;
+  icons.forEach(icon=>{x+=spacingX; if(x>maxWidth){x=startX; y+=spacingY;}});
+  return {x,y};
+}
+
+document.getElementById("ctxNewFolder").onclick=()=>{ createIconElement("Klasör", "folder"); };
+document.getElementById("ctxNewText").onclick=()=>{ createIconElement("YeniDosya.txt", "file"); };
+
+document.getElementById("ctxNewBpf").onclick=()=>{
+  const sampleBpfContent = `
+    <style>body{font-family:sans-serif; text-align:center; padding:20px; background:#e0f7fa; color:#333;}</style>
+    <h2 style='color:#0066cc;'>✨ Yeni BPF Uygulaması</h2>
+    <p>Bu pencere özelleştirilebilir BPF kodundan çalışmaktadır.</p>
+    <p>Sağ tıklayıp <b>"Not Defteri ile Düzenle"</b> diyerek HTML kodunu değiştirebilirsiniz!</p>
+    <button style='padding:10px 20px; background:#008080; color:white; border:none; border-radius:5px; cursor:pointer;' onclick='alert("BPF Butonu Çalıştı!")'>Tıkla</button>
+  `;
+  createIconElement("Uygulama.bpf", "bpf", sampleBpfContent);
+};
+
+document.getElementById("ctxWallpaper").onclick=()=>{
+  const picker=document.createElement("input"); picker.type="file"; picker.accept="image/*";
+  picker.onchange=(e)=>{desktop.style.backgroundImage=`url(${URL.createObjectURL(e.target.files[0])})`; desktop.style.backgroundSize="cover"; desktop.style.backgroundPosition="center";};
+  picker.click();
+};
+
+document.getElementById("ctxResetIcons").onclick=()=>{
+  const icons=Array.from(desktop.querySelectorAll(".icon")).filter(i=>i!==fmIcon);
+  icons.forEach((icon,index)=>{
+    const spacingX=80, spacingY=100, startX=100, startY=20, maxWidth=window.innerWidth-spacingX;
+    let x=startX+(index*spacingX)%maxWidth; 
+    let y=startY+Math.floor((index*spacingX)/maxWidth)*spacingY;
+    icon.style.left=x+"px"; icon.style.top=y+"px";
+  });
+};
+
+document.getElementById("ctxSettings").onclick=()=>{
+  const win=document.createElement("div"); win.className="window";
+  const header=document.createElement("div"); header.className="window-header";
+  const title=document.createElement("span"); title.textContent="Ayarlar";
+  const maxBtn=document.createElement("button"); maxBtn.textContent='⬜';
+  const closeBtn=document.createElement("button"); closeBtn.textContent='X';
+  header.appendChild(title); header.appendChild(maxBtn); header.appendChild(closeBtn);
+  
+  const content=document.createElement("div"); content.className="window-content";
+  content.style.cssText = "padding:15px; text-align:left; justify-content:flex-start; align-items:flex-start; box-sizing:border-box; overflow-y:auto;";
+  
+  const uptimeSec = Math.floor((Date.now() - startTime) / 1000);
+
+  content.innerHTML = `
+    <h3 style="margin-top:0;">Masaüstü Arka Plan Rengi</h3>
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+      <button class="bg-btn" data-color="#001f4d" style="width:30px; height:30px; background:#001f4d; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="bg-btn" data-color="#111111" style="width:30px; height:30px; background:#111111; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="bg-btn" data-color="#004d40" style="width:30px; height:30px; background:#004d40; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="bg-btn" data-color="#3e2723" style="width:30px; height:30px; background:#3e2723; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="bg-btn" data-color="#4a154b" style="width:30px; height:30px; background:#4a154b; border:1px solid #fff; cursor:pointer;"></button>
+    </div>
+
+    <h3>Görev Çubuğu Rengi</h3>
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+      <button class="tb-btn" data-color="#003366" style="width:30px; height:30px; background:#003366; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="tb-btn" data-color="#1a1a1a" style="width:30px; height:30px; background:#1a1a1a; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="tb-btn" data-color="#2c3e50" style="width:30px; height:30px; background:#2c3e50; border:1px solid #fff; cursor:pointer;"></button>
+      <button class="tb-dir" data-color="#004d40" style="width:30px; height:30px; background:#004d40; border:1px solid #fff; cursor:pointer;"></button>
+    </div>
+
+    <h3>Sistem Bilgisi</h3>
+    <p style="font-size:13px; color:#ccc; line-height:1.6;">
+      <b>Sürüm:</b> BGOS 1.6.0<br>
+      <b>Geliştirici:</b> BatuJS Software<br>
+      <b>Sistem Çalışma Süresi:</b> ${uptimeSec} saniye
+    </p>
+  `;
+
+  content.querySelectorAll('.bg-btn').forEach(btn => {
+    btn.onclick = () => { desktop.style.backgroundImage = 'none'; desktop.style.backgroundColor = btn.dataset.color; };
+  });
+
+  content.querySelectorAll('.tb-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.getElementById('taskbar').style.backgroundColor = btn.dataset.color;
+      document.getElementById('startMenu').style.backgroundColor = btn.dataset.color;
+    };
+  });
+
+  win.appendChild(header); win.appendChild(content); desktop.appendChild(win);
+  win.style.width = '360px'; win.style.height = '350px';
+  zIndexCounter++; win.style.zIndex = zIndexCounter; makeWindowInteractive(win, header, maxBtn, closeBtn, "Ayarlar");
+};
+
+const fileManager=document.getElementById('fileManager');
+const closeFileManager=document.getElementById('closeFileManager');
+function openFM(){
+    fileManager.style.display='flex'; 
+    startMenu.style.display='none';
+    zIndexCounter++; fileManager.style.zIndex = zIndexCounter;
+}
+closeFileManager.onclick=()=>fileManager.style.display='none';
+
+translateUI();
+</script>
+</body>
+</html>

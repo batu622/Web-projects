@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Süper Web Araç Kutusu</title>
+<style>
+  /* V2 ORİJİNAL GENEL STİLLER */
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+    background-color: #f0f2f5;
+  }
+  #menu {
+    width: 220px;
+    background: #ffffff;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 0;
+    overflow-y: auto;
+  }
+  .menu-item {
+    padding: 15px 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.95em;
+  }
+  .menu-item:hover {
+    background: #eee;
+  }
+  .menu-item.active {
+    background: #ddd;
+    font-weight: bold;
+  }
+  #content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .tool {
+    display: none;
+  }
+  .tool.active {
+    display: block;
+  }
+  textarea, input, button, select {
+    font-family: inherit;
+    margin-bottom: 10px;
+    padding: 5px;
+  }
+  button {
+    cursor: pointer;
+    padding: 6px 12px;
+    background: #e0e0e0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  button:hover {
+    background: #d0d0d0;
+  }
+  
+  /* V2 ORİJİNAL ZİHİN HARİTASI İÇİN */
+  #nodes {
+    width: 100%;
+    height: 350px;
+    background: #fff;
+    border: 1px dashed #ccc;
+    position: relative;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .node {
+    padding: 8px 12px;
+    background: #4CAF50;
+    color: #fff;
+    border-radius: 4px;
+    display: inline-block;
+    position: absolute;
+    cursor: grab;
+    user-select: none;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.15);
+  }
+  .node:active { cursor: grabbing; }
+  canvas { border: 1px solid #ccc; background: #fff; }
+
+  /* V2 ORİJİNAL MİNİ ARAÇ STİLLERİ */
+  .qr-container img { margin-top: 10px; border: 5px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+  .stopwatch-display { font-size: 2em; font-family: monospace; font-weight: bold; margin: 10px 0; }
+  
+  /* V2 ORİJİNAL GELİŞMİŞ BİLİM DENEYİ (BALONCUKLAR) */
+  #beaker { position: relative; overflow: hidden; }
+  @keyframes rise {
+    0% { bottom: -10px; transform: translateX(0); opacity: 1; }
+    50% { transform: translateX(5px); }
+    100% { bottom: 100%; transform: translateX(-5px); opacity: 0; }
+  }
+  .bubble {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
+    bottom: -10px;
+    animation: rise 2s infinite ease-in;
+  }
+
+  /* V2 ORİJİNAL GELİŞMİŞ ANKET (YÜZDE ÇUBUKLARI) */
+  .poll-bar-container { width: 100%; background: #ddd; border-radius: 4px; margin-top: 5px; height: 20px; position: relative; }
+  .poll-bar-fill { height: 100%; background: #4CAF50; border-radius: 4px; transition: width 0.4s; }
+  .poll-bar-text { position: absolute; top: 0; left: 10px; font-size: 0.85em; line-height: 20px; font-weight: bold; color: #333; }
+
+  /* V2 ORİJİNAL XOX OYUNU STİLLERİ */
+  .tic-board { display: grid; grid-template-columns: repeat(3, 80px); gap: 5px; margin-top: 15px; }
+  .tic-cell { width: 80px; height: 80px; background: #fff; border: 2px solid #aaa; font-size: 2.5em; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; font-family: sans-serif; user-select: none; }
+  .tic-cell:hover { background: #f9f9f9; }
+
+  /* === YENİ EKLENEN OYUN VE ARAÇLARIN STİLLERİ === */
+  .memory-board { display: grid; grid-template-columns: repeat(4, 70px); gap: 10px; margin-top: 15px; perspective: 1000px; }
+  .memory-card { width: 70px; height: 70px; background: #2196F3; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2em; cursor: pointer; color: transparent; transition: transform 0.4s, background 0.4s; transform-style: preserve-3d; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+  .memory-card.flipped { background: #fff; color: initial; transform: rotateY(180deg); border: 2px solid #2196F3; cursor: default; }
+  .rgb-slider-container { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .rgb-slider-container input[type=range] { flex: 1; }
+</style>
+</head>
+<body>
+<div id="menu">
+  <div class="menu-item" data-tool="mindmap">Zihin Haritası</div>
+  <div class="menu-item" data-tool="randomTask">Rastgele Deneyim</div>
+  <div class="menu-item" data-tool="goals">Hedef & Ödül</div>
+  <div class="menu-item" data-tool="science">Mini Bilim Deneyi 🧪</div>
+  <div class="menu-item" data-tool="notepad">Mini Not Defteri</div>
+  <div class="menu-item" data-tool="quotes">Rastgele İlham</div>
+  <div class="menu-item" data-tool="drawing">Mini Çizim Tahtası</div>
+  <div class="menu-item" data-tool="timer">Zamanlayıcı</div>
+  <div class="menu-item" data-tool="poll">Mini Anket 📊</div>
+  <div class="menu-item" data-tool="passwordGen">Şifre Oluşturucu</div>
+  <div class="menu-item" data-tool="wordCounter">Kelime Sayacı</div>
+  <div class="menu-item" data-tool="colorPicker">Renk Paleti</div>
+  <div class="menu-item" data-tool="unitConverter">Birim Dönüştürücü</div>
+  <div class="menu-item" data-tool="games">Şans Oyunları</div>
+  <div class="menu-item" data-tool="snake">Yılan Oyunu 🐍</div>
+  <div class="menu-item" data-tool="calculator">Hesap Makinesi</div>
+  <div class="menu-item" data-tool="qrGen">QR Kod Oluşturucu</div>
+  <div class="menu-item" data-tool="stopwatch">Kronometre</div>
+  <div class="menu-item" data-tool="bmiCalc">VKİ Hesaplayıcı</div>
+  <div class="menu-item" data-tool="textCrypter">Metin Şifreleyici</div>
+  <div class="menu-item" data-tool="tictactoe">XOX Oyunu ⭕❌</div>
+  <div class="menu-item" data-tool="tts">Metin Okuyucu (Ses)</div>
+  <div class="menu-item" data-tool="ageCalc">Tam Yaş Hesaplayıcı</div>
+  <div class="menu-item" data-tool="morse">Mors Alfabesi Çevirici</div>
+  <div class="menu-item" data-tool="loanCalc">Kredi Hesaplayıcı</div>
+  <div class="menu-item" data-tool="loremGen">Lorem Ipsum Üretici</div>
+
+  <div class="menu-item" style="background: #e8f5e9; font-weight:bold; cursor:default; text-align:center;">--- YENİLER ---</div>
+  <div class="menu-item" data-tool="memoryGame">Hafıza Kartları 🃏</div>
+  <div class="menu-item" data-tool="rpsGame">Taş Kağıt Makas ✊✌️</div>
+  <div class="menu-item" data-tool="pomodoro">Pomodoro Sayacı 🍅</div>
+  <div class="menu-item" data-tool="typingTest">Yazım Hızı Testi ⌨️</div>
+  <div class="menu-item" data-tool="raffle">Çekiliş Aracı 🎁</div>
+  <div class="menu-item" data-tool="caseConv">Harf Dönüştürücü 🔠</div>
+  <div class="menu-item" data-tool="vatCalc">KDV Hesaplayıcı 🧾</div>
+  <div class="menu-item" data-tool="percentCalc">Yüzde Hesaplayıcı %</div>
+  <div class="menu-item" data-tool="rgbCalc">RGB-HEX Renk Aracı 🎨</div>
+</div>
+
+<div id="content">
+  <div id="mindmap" class="tool">
+    <h2>Zihin Haritası</h2>
+    <p style="font-size: 0.9em; color: #666;">Düğümleri farenizle sürükleyerek yerlerini değiştirebilirsiniz.</p>
+    <div id="nodes"></div>
+    <input id="nodeInput" placeholder="Yeni düğüm ekle">
+    <button onclick="addNode()">Ekle</button>
+  </div>
+
+  <div id="randomTask" class="tool">
+    <h2>Rastgele Deneyim</h2>
+    <button onclick="generateTask()">Görev Oluştur</button>
+    <p id="taskOutput" style="font-size: 1.2em; margin-top:15px;"></p>
+  </div>
+
+  <div id="goals" class="tool">
+    <h2>Hedef & Ödül</h2>
+    <input id="goalInput" placeholder="Yeni hedef">
+    <button onclick="addGoal()">Ekle</button>
+    <ul id="goalList"></ul>
+  </div>
+
+  <div id="science" class="tool">
+    <h2>Mini Bilim Deneyi: İnteraktif pH Laboratuvarı 🧪</h2>
+    <p>Kimyasalları seçerek solüsyonun pH değerini ve reaksiyonunu inceleyin.</p>
+    
+    <div id="beaker" style="width: 140px; height: 180px; border: 4px solid #555; border-top: none; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; margin: 20px auto; background-color: #77dd77; transition: background-color 0.5s; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 20px;">
+      <span id="phDisplay" style="font-weight: bold; color: #fff; text-shadow: 1px 1px 3px #000; font-size: 1.4em; z-index: 10;">pH 7.0</span>
+    </div>
+    
+    <div style="text-align: center;">
+      <select id="chemicalSelect" style="padding: 5px;">
+        <option value="0">Madde Seçin...</option>
+        <option value="-2">Limon Suyu Damlat (Güçlü Asit)</option>
+        <option value="-1">Sirke Ekle (Asit)</option>
+        <option value="-3">Tuz Ruhu Dök (Tehlikeli Asit!)</option>
+        <option value="1">Sabunlu Su Ekle (Baz)</option>
+        <option value="2">Karbonat Ekle (Güçlü Baz)</option>
+        <option value="3">Çamaşır Suyu Dök (Tehlikeli Baz!)</option>
+      </select>
+      <button onclick="mixChemical()" style="background: #2196F3; color: white;">Karıştır</button>
+      <button onclick="resetPh()">Saf Suya Dön (Sıfırla)</button>
+    </div>
+    <p id="scienceInfo" style="text-align: center; font-weight: bold; color: #2ecc71; margin-top: 15px; font-size: 1.1em;">Çözelti: Nötr (Saf Su)</p>
+  </div>
+
+  <div id="notepad" class="tool">
+    <h2>Mini Not Defteri</h2>
+    <textarea id="noteArea" rows="10" cols="50" placeholder="Notlarınızı buraya yazın..."></textarea><br>
+    <button onclick="saveNote()">Kaydet</button>
+  </div>
+
+  <div id="quotes" class="tool">
+    <h2>Rastgele İlham</h2>
+    <button onclick="generateQuote()">İlham Al</button>
+    <p id="quoteOutput" style="font-style: italic; font-size: 1.2em; margin-top:15px;"></p>
+  </div>
+
+  <div id="drawing" class="tool">
+    <h2>Mini Çizim Tahtası (Gelişmiş)</h2>
+    <div style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center;">
+      <input type="color" id="brushColor" value="#000000" title="Renk Seç">
+      <input type="range" id="brushSize" min="1" max="30" value="3" title="Fırça Kalınlığı">
+      <button onclick="setEraser()" id="eraserBtn">Silgi</button>
+      <button onclick="clearCanvas()">Temizle</button>
+    </div>
+    <canvas id="drawCanvas" width="600" height="400" style="cursor: crosshair;"></canvas>
+  </div>
+
+  <div id="timer" class="tool">
+    <h2>Zamanlayıcı</h2>
+    <input type="number" id="timerInput" placeholder="Dakika">
+    <button onclick="startTimer()">Başlat</button>
+    <p id="timerOutput" style="font-size: 2em;"></p>
+  </div>
+
+  <div id="poll" class="tool">
+    <h2>Mini Anket 📊</h2>
+    <p>Seçenekleri ekleyin, ardından listeden oy verin ve sonuçları görün.</p>
+    <input id="pollOption" placeholder="Yeni seçenek yazın...">
+    <button onclick="addPollOption()">Seçenek Ekle</button>
+    <button onclick="showPoll()" style="background: #FF9800; color: white;">Sonuçları Göster / Gizle</button>
+    
+    <ul id="pollOptionsList" style="list-style-type: none; padding: 0; margin-top: 15px;"></ul>
+    <div id="pollResultArea" style="margin-top: 20px; display: none;">
+      <h3>Canlı Sonuçlar:</h3>
+      <div id="pollResultBars"></div>
+    </div>
+  </div>
+
+  <div id="passwordGen" class="tool">
+    <h2>Şifre Oluşturucu</h2>
+    <input type="number" id="passLength" placeholder="Uzunluk" value="12">
+    <button onclick="generatePassword()">Oluştur</button>
+    <p id="passOutput" style="font-weight: bold; font-family: monospace; font-size: 1.2em;"></p>
+  </div>
+
+  <div id="wordCounter" class="tool">
+    <h2>Kelime Sayacı</h2>
+    <textarea id="wordArea" rows="8" cols="50" oninput="countWords()"></textarea>
+    <p id="wordCountOutput">Kelime: 0 | Karakter: 0</p>
+  </div>
+
+  <div id="colorPicker" class="tool">
+    <h2>Renk Paleti</h2>
+    <input type="color" id="colorInput" value="#4CAF50" oninput="updateColor()" style="width: 100px; height: 50px;">
+    <p id="colorOutput" style="font-weight: bold; font-family: monospace; font-size: 1.2em;">HEX: #4CAF50</p>
+  </div>
+
+  <div id="unitConverter" class="tool">
+    <h2>Birim Dönüştürücü</h2>
+    <input type="number" id="unitInput" value="1" oninput="convertUnits()">
+    <select id="unitType" onchange="convertUnits()">
+      <option value="kmToMile">Kilometre -> Mil</option>
+      <option value="mileToKm">Mil -> Kilometre</option>
+      <option value="cToF">°C -> °F</option>
+      <option value="fToC">°F -> °C</option>
+    </select>
+    <p id="unitOutput" style="font-weight: bold; font-size: 1.1em;"></p>
+  </div>
+
+  <div id="games" class="tool">
+    <h2>Zar At & Yazı Tura</h2>
+    <div><button onclick="rollDice()">Zar At 🎲</button> <span id="diceResult" style="font-size: 1.5em; font-weight: bold;">-</span></div><br>
+    <div><button onclick="flipCoin()">Yazı Tura 🪙</button> <span id="coinResult" style="font-size: 1.5em; font-weight: bold;">-</span></div>
+  </div>
+
+  <div id="snake" class="tool">
+    <h2>Yılan Oyunu 🐍</h2>
+    <p>Skor: <strong id="snakeScore" style="font-size: 1.2em; color: #d32f2f;">0</strong></p>
+    <canvas id="snakeCanvas" width="400" height="400" style="background: #e8e8e8;"></canvas><br>
+    <button onclick="startSnakeGame()">Oyunu Başlat / Sıfırla</button>
+  </div>
+
+  <div id="calculator" class="tool">
+    <h2>Hesap Makinesi</h2>
+    <input type="number" id="calcA" placeholder="Sayı 1" style="width: 100px;">
+    <select id="calcOp">
+      <option value="+">+</option><option value="-">-</option><option value="*">x</option><option value="/">÷</option>
+    </select>
+    <input type="number" id="calcB" placeholder="Sayı 2" style="width: 100px;">
+    <button onclick="calculateResult()">= Hesapla</button>
+    <p id="calcResult" style="font-size: 1.5em; font-weight: bold;"></p>
+  </div>
+
+  <div id="qrGen" class="tool">
+    <h2>QR Kod Oluşturucu</h2>
+    <input type="text" id="qrInput" placeholder="Metin veya URL girin" style="width: 300px;">
+    <button onclick="generateQR()">Oluştur</button>
+    <div class="qr-container" id="qrContainer"></div>
+  </div>
+
+  <div id="stopwatch" class="tool">
+    <h2>Kronometre</h2>
+    <div class="stopwatch-display" id="swDisplay">00:00:00</div>
+    <button onclick="startStopwatch()" style="background: #4CAF50; color: white;">Başlat</button>
+    <button onclick="stopStopwatch()" style="background: #f44336; color: white;">Durdur</button>
+    <button onclick="resetStopwatch()">Sıfırla</button>
+  </div>
+
+  <div id="bmiCalc" class="tool">
+    <h2>Vücut Kitle İndeksi (VKİ)</h2>
+    <input type="number" id="bmiWeight" placeholder="Kilo (kg)" style="width: 120px;">
+    <input type="number" id="bmiHeight" placeholder="Boy (cm)" style="width: 120px;">
+    <button onclick="calculateBMI()">Hesapla</button>
+    <p id="bmiResult" style="font-weight: bold; font-size: 1.1em;"></p>
+  </div>
+
+  <div id="textCrypter" class="tool">
+    <h2>Metin Şifreleyici (Base64)</h2>
+    <textarea id="cryptInput" rows="4" cols="50" placeholder="Metni buraya yazın..."></textarea><br>
+    <button onclick="encryptText()">Şifrele</button>
+    <button onclick="decryptText()">Çöz</button>
+    <p id="cryptOutput" style="background: #fff; padding: 10px; border: 1px solid #ccc; word-break: break-all; min-height: 20px;"></p>
+  </div>
+
+  <div id="tictactoe" class="tool">
+    <h2>XOX Oyunu ⭕❌</h2>
+    <p>Sıra: <span id="xoxTurn" style="font-weight: bold; font-size: 1.2em; color: #2196F3;">X</span></p>
+    <div class="tic-board" id="ticBoard">
+      <div class="tic-cell" onclick="makeTicMove(0)"></div><div class="tic-cell" onclick="makeTicMove(1)"></div><div class="tic-cell" onclick="makeTicMove(2)"></div>
+      <div class="tic-cell" onclick="makeTicMove(3)"></div><div class="tic-cell" onclick="makeTicMove(4)"></div><div class="tic-cell" onclick="makeTicMove(5)"></div>
+      <div class="tic-cell" onclick="makeTicMove(6)"></div><div class="tic-cell" onclick="makeTicMove(7)"></div><div class="tic-cell" onclick="makeTicMove(8)"></div>
+    </div>
+    <button onclick="resetTicTacToe()" style="margin-top: 15px;">Oyunu Sıfırla</button>
+    <p id="ticWinner" style="font-weight: bold; font-size: 1.5em; color: #4CAF50;"></p>
+  </div>
+
+  <div id="tts" class="tool">
+    <h2>Metin Okuyucu (Text-to-Speech) 🗣️</h2>
+    <p>Yazdığınız metni tarayıcının sesiyle dinleyin.</p>
+    <textarea id="ttsInput" rows="5" cols="50" placeholder="Okunmasını istediğiniz metni buraya yazın..."></textarea><br>
+    <button onclick="speakText()" style="background: #9C27B0; color: white;">Sesli Oku</button>
+  </div>
+
+  <div id="ageCalc" class="tool">
+    <h2>Tam Yaş Hesaplayıcı 🎂</h2>
+    <p>Doğum tarihinizi seçin:</p>
+    <input type="date" id="bdayInput">
+    <button onclick="calculateExactAge()">Hesapla</button>
+    <p id="ageOutput" style="font-weight: bold; font-size: 1.2em; margin-top: 15px;"></p>
+  </div>
+
+  <div id="morse" class="tool">
+    <h2>Mors Alfabesi Çevirici 📟</h2>
+    <textarea id="morseInput" rows="4" cols="50" placeholder="Normal metin yazın..."></textarea><br>
+    <button onclick="translateToMorse()">Mors'a Çevir</button>
+    <p id="morseOutput" style="background: #fff; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 1.5em; font-weight: bold; letter-spacing: 2px; min-height: 30px;"></p>
+  </div>
+
+  <div id="loanCalc" class="tool">
+    <h2>Aylık Kredi/Taksit Hesaplayıcı 💰</h2>
+    <input type="number" id="loanAmount" placeholder="Kredi Tutarı (Örn: 10000)" style="width: 180px;"><br>
+    <input type="number" id="loanRate" placeholder="Aylık Faiz Oranı (%) (Örn: 1.5)" style="width: 180px;"><br>
+    <input type="number" id="loanMonths" placeholder="Vade (Ay) (Örn: 12)" style="width: 180px;"><br>
+    <button onclick="calculateLoan()" style="background: #4CAF50; color: white;">Taksit Hesapla</button>
+    <p id="loanOutput" style="font-weight: bold; font-size: 1.2em;"></p>
+  </div>
+
+  <div id="loremGen" class="tool">
+    <h2>Lorem Ipsum Üretici 📝</h2>
+    <p>Tasarımcılar için rastgele dolgu metni.</p>
+    <input type="number" id="loremCount" placeholder="Kaç paragraf?" value="1" min="1" max="10">
+    <button onclick="generateLorem()">Üret</button>
+    <div id="loremOutput" style="margin-top: 15px; background: #fff; padding: 15px; border: 1px solid #ccc; font-size: 0.9em; line-height: 1.6; max-height: 300px; overflow-y: auto;"></div>
+  </div>
+
+
+  <div id="memoryGame" class="tool">
+    <h2>Hafıza Kartları Oyunu 🃏</h2>
+    <p>Çift olan emojileri bularak eşleştirin. <span id="memoryMoves" style="font-weight:bold;">Hamle: 0</span></p>
+    <div class="memory-board" id="memoryBoard"></div>
+    <button onclick="initMemoryGame()" style="margin-top:15px;">Oyunu Yeniden Başlat</button>
+  </div>
+
+  <div id="rpsGame" class="tool">
+    <h2>Taş - Kağıt - Makas ✊✌️🖐️</h2>
+    <p>Bilgisayara karşı oynayın!</p>
+    <div style="font-size: 2em; margin-bottom: 15px;">
+      <button onclick="playRPS('Taş')" style="font-size: 1.5em; background:transparent; border:none;" title="Taş">✊</button>
+      <button onclick="playRPS('Kağıt')" style="font-size: 1.5em; background:transparent; border:none;" title="Kağıt">🖐️</button>
+      <button onclick="playRPS('Makas')" style="font-size: 1.5em; background:transparent; border:none;" title="Makas">✌️</button>
+    </div>
+    <p id="rpsResult" style="font-size: 1.2em; font-weight: bold;"></p>
+    <p>Skor: Sen <span id="rpsPlayerScore" style="color:#4CAF50; font-weight:bold;">0</span> - <span id="rpsCompScore" style="color:#f44336; font-weight:bold;">0</span> Bilgisayar</p>
+    <button onclick="resetRPS()">Skoru Sıfırla</button>
+  </div>
+
+  <div id="pomodoro" class="tool">
+    <h2>Pomodoro Sayacı 🍅</h2>
+    <p>25 dakika odaklan, 5 dakika dinlen.</p>
+    <div id="pomoDisplay" style="font-size: 4em; font-family: monospace; font-weight: bold; color: #d32f2f;">25:00</div>
+    <button onclick="startPomodoro()" style="background:#4CAF50; color:white;">Başlat / Duraklat</button>
+    <button onclick="switchPomodoro(25)">Çalışma (25dk)</button>
+    <button onclick="switchPomodoro(5)">Mola (5dk)</button>
+  </div>
+
+  <div id="typingTest" class="tool">
+    <h2>Yazım Hızı Testi (WPM) ⌨️</h2>
+    <p id="typingTarget" style="font-style: italic; background: #e3f2fd; padding: 10px; border-radius: 4px; user-select: none;">Hızlı kahverengi tilki tembel köpeğin üzerinden atlar. Bu klasik bir daktilo test cümlesidir.</p>
+    <textarea id="typingInput" rows="3" cols="50" placeholder="Yukarıdaki metni buraya yazmaya başlayın..." oninput="checkTyping()"></textarea><br>
+    <button onclick="resetTypingTest()">Testi Sıfırla</button>
+    <p id="typingResult" style="font-weight: bold; font-size: 1.2em;"></p>
+  </div>
+
+  <div id="raffle" class="tool">
+    <h2>Rastgele Çekiliş Aracı 🎁</h2>
+    <p>İsimleri alt alta yazın.</p>
+    <textarea id="raffleInput" rows="6" cols="40" placeholder="Ali&#10;Ayşe&#10;Mehmet"></textarea><br>
+    <button onclick="drawRaffle()" style="background: #FF9800; color: white;">Çekiliş Yap</button>
+    <div id="raffleWinner" style="margin-top: 15px; font-size: 1.5em; font-weight: bold; color: #E91E63;"></div>
+  </div>
+
+  <div id="caseConv" class="tool">
+    <h2>Büyük/Küçük Harf Dönüştürücü 🔠</h2>
+    <textarea id="caseInput" rows="4" cols="50" placeholder="Metninizi buraya yapıştırın..."></textarea><br>
+    <button onclick="convertCase('upper')">TÜMÜ BÜYÜK</button>
+    <button onclick="convertCase('lower')">tümü küçük</button>
+    <button onclick="convertCase('title')">Her Kelime Büyük</button>
+  </div>
+
+  <div id="vatCalc" class="tool">
+    <h2>Vergi (KDV) Hesaplayıcı 🧾</h2>
+    <input type="number" id="vatPrice" placeholder="Tutar (TL)">
+    <select id="vatRate">
+      <option value="20">%20 KDV</option>
+      <option value="18">%18 KDV</option>
+      <option value="10">%10 KDV</option>
+      <option value="1">%1 KDV</option>
+    </select><br>
+    <button onclick="calcVat(true)">KDV Ekle (+)</button>
+    <button onclick="calcVat(false)">KDV Çıkar (-)</button>
+    <p id="vatResult" style="font-weight: bold; font-size: 1.1em; margin-top: 15px;"></p>
+  </div>
+
+  <div id="percentCalc" class="tool">
+    <h2>Yüzde Hesaplayıcı %</h2>
+    <div>
+      <input type="number" id="pctA" style="width: 80px;" placeholder="Sayının">
+      <span>sayısının %</span>
+      <input type="number" id="pctB" style="width: 80px;" placeholder="Yüzdesi">
+      <span>kaçtır?</span>
+      <button onclick="calcPercent()">Hesapla</button>
+    </div>
+    <p id="pctResult" style="font-weight: bold; font-size: 1.2em; color: #2196F3;"></p>
+  </div>
+
+  <div id="rgbCalc" class="tool">
+    <h2>RGB - HEX Renk Simülatörü 🎨</h2>
+    <div style="display:flex; gap: 20px;">
+      <div style="flex:1;">
+        <div class="rgb-slider-container"><span style="color:red; font-weight:bold;">R:</span><input type="range" id="rgbR" min="0" max="255" value="76" oninput="updateRgb()"> <span id="valR">76</span></div>
+        <div class="rgb-slider-container"><span style="color:green; font-weight:bold;">G:</span><input type="range" id="rgbG" min="0" max="255" value="175" oninput="updateRgb()"> <span id="valG">175</span></div>
+        <div class="rgb-slider-container"><span style="color:blue; font-weight:bold;">B:</span><input type="range" id="rgbB" min="0" max="255" value="80" oninput="updateRgb()"> <span id="valB">80</span></div>
+      </div>
+      <div id="rgbPreview" style="width: 100px; height: 100px; background: rgb(76,175,80); border: 2px solid #ccc; border-radius: 8px;"></div>
+    </div>
+    <p id="rgbHexOutput" style="font-size: 1.5em; font-family: monospace; font-weight: bold; margin-top: 15px;">#4CAF50</p>
+  </div>
+
+</div>
+
+<script>
+// V2 ORİJİNAL MENÜ GEÇİŞ SİSTEMİ
+const menuItems = document.querySelectorAll('.menu-item');
+const tools = document.querySelectorAll('.tool');
+
+if(menuItems.length > 0 && tools.length > 0) {
+  menuItems[0].classList.add('active');
+  tools[0].classList.add('active');
+}
+
+menuItems.forEach(item => {
+  item.addEventListener('click', () => {
+    // Çizgi şeklinde "yeniler" menüsüne tıklandığında hata vermesin diye kontrol
+    if(item.dataset.tool) {
+      menuItems.forEach(i => i.classList.remove('active'));
+      tools.forEach(t => t.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById(item.dataset.tool).classList.add('active');
+    }
+  });
+});
+
+// V2 ORİJİNAL ZİHİN HARİTASI
+function addNode() {
+  const val = document.getElementById('nodeInput').value;
+  if(val){
+    const node = document.createElement('div');
+    node.className = 'node'; node.textContent = val;
+    node.style.left = Math.floor(Math.random() * 200 + 20) + 'px';
+    node.style.top = Math.floor(Math.random() * 200 + 20) + 'px';
+    document.getElementById('nodes').appendChild(node);
+    document.getElementById('nodeInput').value = '';
+    makeDraggable(node);
+  }
+}
+function makeDraggable(el) {
+  let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+  el.onmousedown = (e) => {
+    e.preventDefault();
+    pos3 = e.clientX; pos4 = e.clientY;
+    document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
+    document.onmousemove = (e) => {
+      e.preventDefault();
+      pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
+      pos3 = e.clientX; pos4 = e.clientY;
+      let newTop = el.offsetTop - pos2; let newLeft = el.offsetLeft - pos1;
+      const parent = document.getElementById('nodes');
+      if(newTop >= 0 && newTop <= (parent.clientHeight - el.clientHeight)) el.style.top = newTop + "px";
+      if(newLeft >= 0 && newLeft <= (parent.clientWidth - el.clientWidth)) el.style.left = newLeft + "px";
+    };
+  };
+}
+
+// V2 ORİJİNAL RASTGELE GÖREV
+const tasks = ['5 dakikalık yürüyüş', 'Bir bardak su iç', '10 derin nefes al', 'Hızlı çizim yap'];
+function generateTask(){ document.getElementById('taskOutput').textContent = tasks[Math.floor(Math.random()*tasks.length)]; }
+
+// V2 ORİJİNAL HEDEFLER
+function addGoal(){
+  const val = document.getElementById('goalInput').value;
+  if(val){
+    const li = document.createElement('li'); li.textContent = val;
+    document.getElementById('goalList').appendChild(li); document.getElementById('goalInput').value = '';
+  }
+}
+
+// V2 ORİJİNAL GELİŞTİRİLMİŞ BİLİM DENEYİ (pH LAB)
+let currentPh = 7.0;
+function mixChemical() {
+  const select = document.getElementById('chemicalSelect');
+  const amount = parseFloat(select.value);
+  if(amount !== 0) {
+    createBubble(); // Animasyon tetikle
+    currentPh = Math.max(0, Math.min(14, currentPh + amount));
+    updateScienceExperiment();
+  }
+}
+function resetPh() { currentPh = 7.0; updateScienceExperiment(); }
+function updateScienceExperiment() {
+  document.getElementById('phDisplay').textContent = `pH ${currentPh.toFixed(1)}`;
+  const beaker = document.getElementById('beaker'), info = document.getElementById('scienceInfo');
+  
+  if (currentPh < 3) { beaker.style.backgroundColor = "#d32f2f"; info.textContent = "Tehlikeli Asit (Dikkat!)"; info.style.color = "#d32f2f"; }
+  else if (currentPh < 7) { beaker.style.backgroundColor = "#ffb300"; info.textContent = "Zayıf Asit (Örn: Limon/Sirke)"; info.style.color = "#ffb300"; }
+  else if (currentPh === 7) { beaker.style.backgroundColor = "#77dd77"; info.textContent = "Nötr (Saf Su)"; info.style.color = "#2ecc71"; }
+  else if (currentPh <= 11) { beaker.style.backgroundColor = "#4bcffa"; info.textContent = "Zayıf Baz (Örn: Sabun/Karbonat)"; info.style.color = "#3498db"; }
+  else { beaker.style.backgroundColor = "#6a1b9a"; info.textContent = "Tehlikeli Baz (Dikkat!)"; info.style.color = "#6a1b9a"; }
+}
+function createBubble() {
+  const beaker = document.getElementById('beaker');
+  for(let i=0; i<5; i++) {
+    setTimeout(() => {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      const size = Math.random() * 15 + 5;
+      bubble.style.width = size + 'px'; bubble.style.height = size + 'px';
+      bubble.style.left = Math.random() * 80 + 10 + '%';
+      beaker.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 2000);
+    }, i * 200);
+  }
+}
+
+// V2 ORİJİNAL NOT DEFTERİ & İLHAM
+function saveNote(){ localStorage.setItem('note', document.getElementById('noteArea').value); }
+document.getElementById('noteArea').value = localStorage.getItem('note')||'';
+const quotes = ['İmkansız sadece bir fikirdir','Başarı azimli olanındır','Denemekten korkma','Hayal et ve yap'];
+function generateQuote(){ document.getElementById('quoteOutput').textContent = quotes[Math.floor(Math.random()*quotes.length)]; }
+
+// V2 ORİJİNAL ÇİZİM TAHTASI
+const dCanvas = document.getElementById('drawCanvas'); const dCtx = dCanvas.getContext('2d');
+let isDrawing = false, isEraser = false;
+dCtx.lineJoin = 'round'; dCtx.lineCap = 'round';
+dCanvas.addEventListener('mousedown', (e) => { isDrawing = true; dCtx.beginPath(); dCtx.moveTo(e.offsetX, e.offsetY); });
+dCanvas.addEventListener('mousemove', (e) => {
+  if(isDrawing) {
+    dCtx.strokeStyle = isEraser ? "#ffffff" : document.getElementById('brushColor').value;
+    dCtx.lineWidth = document.getElementById('brushSize').value;
+    dCtx.lineTo(e.offsetX, e.offsetY); dCtx.stroke();
+  }
+});
+dCanvas.addEventListener('mouseup', () => isDrawing = false); dCanvas.addEventListener('mouseout', () => isDrawing = false);
+function setEraser() { isEraser = !isEraser; document.getElementById('eraserBtn').style.background = isEraser ? "#ffcccc" : "#e0e0e0"; }
+function clearCanvas(){ dCtx.clearRect(0,0,dCanvas.width,dCanvas.height); }
+
+// V2 ORİJİNAL ZAMANLAYICI
+let timerInt;
+function startTimer(){
+  clearInterval(timerInt); let time = (parseInt(document.getElementById('timerInput').value)||0) * 60;
+  timerInt = setInterval(()=>{
+    const m = Math.floor(time/60), s = time%60; document.getElementById('timerOutput').textContent = `${m}:${s<10?'0'+s:s}`;
+    if(time<=0) clearInterval(timerInt); time--;
+  },1000);
+}
+
+// V2 ORİJİNAL GELİŞTİRİLMİŞ MİNİ ANKET
+let pollData = [];
+function addPollOption(){
+  const val = document.getElementById('pollOption').value;
+  if(val){ 
+    pollData.push({text: val, votes: 0});
+    renderPollList();
+    document.getElementById('pollOption').value=''; 
+  }
+}
+function renderPollList() {
+  const list = document.getElementById('pollOptionsList');
+  list.innerHTML = '';
+  pollData.forEach((opt, index) => {
+    const li = document.createElement('li');
+    li.style.marginBottom = "8px";
+    li.innerHTML = `
+      <button onclick="votePoll(${index})" style="background: #E3F2FD; border: 1px solid #90CAF9; width: 100%; text-align: left;">
+        + Oy Ver: <strong>${opt.text}</strong>
+      </button>`;
+    list.appendChild(li);
+  });
+  if(document.getElementById('pollResultArea').style.display === 'block') drawPollResults();
+}
+function votePoll(index) {
+  pollData[index].votes++;
+  if(document.getElementById('pollResultArea').style.display === 'block') drawPollResults();
+}
+function showPoll() {
+  const area = document.getElementById('pollResultArea');
+  area.style.display = (area.style.display === 'none' || area.style.display === '') ? 'block' : 'none';
+  if(area.style.display === 'block') drawPollResults();
+}
+function drawPollResults() {
+  const bars = document.getElementById('pollResultBars');
+  bars.innerHTML = '';
+  const totalVotes = pollData.reduce((sum, opt) => sum + opt.votes, 0);
+  
+  if(totalVotes === 0) { bars.innerHTML = "<p>Henüz oy verilmedi.</p>"; return; }
+  
+  pollData.forEach(opt => {
+    const percentage = Math.round((opt.votes / totalVotes) * 100);
+    bars.innerHTML += `
+      <div style="margin-bottom: 10px;">
+        <span>${opt.text} (${opt.votes} oy - %${percentage})</span>
+        <div class="poll-bar-container">
+          <div class="poll-bar-fill" style="width: ${percentage}%;"></div>
+        </div>
+      </div>`;
+  });
+}
+
+// V2 ORİJİNAL DİĞER ARAÇLAR
+function generatePassword() { const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*"; let pass = "", len = parseInt(document.getElementById('passLength').value) || 12; for (let i = 0; i < len; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length)); document.getElementById('passOutput').textContent = pass; }
+function countWords() { const text = document.getElementById('wordArea').value; document.getElementById('wordCountOutput').textContent = `Kelime: ${text.trim().split(/\s+/).filter(w=>w.length>0).length} | Karakter: ${text.length}`; }
+function updateColor() { document.getElementById('colorOutput').textContent = `HEX: ${document.getElementById('colorInput').value.toUpperCase()}`; }
+function convertUnits() { const val = parseFloat(document.getElementById('unitInput').value) || 0, type = document.getElementById('unitType').value; document.getElementById('unitOutput').textContent = type==="kmToMile" ? `${val} KM = ${(val*0.621371).toFixed(2)} Mil` : type==="mileToKm" ? `${val} Mil = ${(val/0.621371).toFixed(2)} KM` : type==="cToF" ? `${val} °C = ${(val*9/5+32).toFixed(2)} °F` : `${val} °F = ${((val-32)*5/9).toFixed(2)} °C`; }
+function rollDice() { document.getElementById('diceResult').textContent = Math.floor(Math.random() * 6) + 1; }
+function flipCoin() { document.getElementById('coinResult').textContent = Math.random() < 0.5 ? "Yazı" : "Tura"; }
+
+// V2 ORİJİNAL YILAN OYUNU
+const sCanvas = document.getElementById("snakeCanvas"); const sCtx = sCanvas.getContext("2d"); const box = 20; let snake, food, score, d, snakeGameInterval;
+window.addEventListener("keydown", function(e) { if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) e.preventDefault(); }, false);
+document.addEventListener("keydown", (e)=>{ if(e.keyCode == 37 && d != "RIGHT") d = "LEFT"; else if(e.keyCode == 38 && d != "DOWN") d = "UP"; else if(e.keyCode == 39 && d != "LEFT") d = "RIGHT"; else if(e.keyCode == 40 && d != "UP") d = "DOWN"; });
+function drawSnake() {
+  sCtx.clearRect(0, 0, sCanvas.width, sCanvas.height);
+  for(let i = 0; i < snake.length; i++) { sCtx.fillStyle = (i == 0) ? "#4CAF50" : "#81C784"; sCtx.fillRect(snake[i].x, snake[i].y, box, box); sCtx.strokeStyle = "#fff"; sCtx.strokeRect(snake[i].x, snake[i].y, box, box); }
+  sCtx.fillStyle = "#f44336"; sCtx.fillRect(food.x, food.y, box, box);
+  let snakeX = snake[0].x, snakeY = snake[0].y;
+  if(d == "LEFT") snakeX -= box; if(d == "UP") snakeY -= box; if(d == "RIGHT") snakeX += box; if(d == "DOWN") snakeY += box;
+  if(snakeX == food.x && snakeY == food.y) { score++; document.getElementById("snakeScore").textContent = score; food = { x: Math.floor(Math.random()*19+1)*box, y: Math.floor(Math.random()*19+1)*box }; } else snake.pop();
+  let newHead = { x: snakeX, y: snakeY };
+  if(snakeX < 0 || snakeY < 0 || snakeX >= sCanvas.width || snakeY >= sCanvas.height || collision(newHead, snake)) { clearInterval(snakeGameInterval); sCtx.fillStyle = "rgba(0,0,0,0.5)"; sCtx.fillRect(0,0,sCanvas.width,sCanvas.height); sCtx.fillStyle = "white"; sCtx.font = "30px Arial"; sCtx.fillText("Oyun Bitti!", 120, 200); return; }
+  snake.unshift(newHead);
+}
+function collision(head, array) { for(let i = 0; i < array.length; i++){ if(head.x == array[i].x && head.y == array[i].y) return true; } return false; }
+function startSnakeGame() { clearInterval(snakeGameInterval); snake = []; snake[0] = { x: 9*box, y: 10*box }; food = { x: Math.floor(Math.random()*19+1)*box, y: Math.floor(Math.random()*19+1)*box }; score = 0; d = "RIGHT"; document.getElementById("snakeScore").textContent = score; snakeGameInterval = setInterval(drawSnake, 100); }
+sCtx.fillStyle = "black"; sCtx.font = "20px Arial"; sCtx.fillText("Başlamak için butona bas", 80, 200);
+
+// V2 ORİJİNAL HESAP VB.
+function calculateResult() { const a=parseFloat(document.getElementById('calcA').value), b=parseFloat(document.getElementById('calcB').value), op=document.getElementById('calcOp').value; document.getElementById('calcResult').textContent = "= " + (!isNaN(a)&&!isNaN(b) ? (op==='+'?a+b : op==='-'?a-b : op==='*'?a*b : b!==0?(a/b).toFixed(4):"Hata") : "Hata"); }
+function generateQR() { const text = document.getElementById('qrInput').value, cont = document.getElementById('qrContainer'); cont.innerHTML = ""; if(text) { const img = document.createElement('img'); img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(text)}`; cont.appendChild(img); } }
+let swInterval, swTime = 0, isRunning = false;
+function updateSwDisplay() { document.getElementById('swDisplay').textContent = `${Math.floor((swTime/60000)%60).toString().padStart(2,'0')}:${Math.floor((swTime/1000)%60).toString().padStart(2,'0')}:${Math.floor((swTime%1000)/10).toString().padStart(2,'0')}`; }
+function startStopwatch() { if(!isRunning) { isRunning = true; let start = Date.now() - swTime; swInterval = setInterval(() => { swTime = Date.now() - start; updateSwDisplay(); }, 10); } }
+function stopStopwatch() { isRunning = false; clearInterval(swInterval); } function resetStopwatch() { stopStopwatch(); swTime = 0; updateSwDisplay(); }
+function calculateBMI() { const w = parseFloat(document.getElementById('bmiWeight').value), h = parseFloat(document.getElementById('bmiHeight').value)/100; if(w>0 && h>0) { const bmi = (w/(h*h)).toFixed(1); document.getElementById('bmiResult').textContent = `VKİ: ${bmi}`; } }
+function encryptText() { document.getElementById('cryptOutput').textContent = btoa(unescape(encodeURIComponent(document.getElementById('cryptInput').value))); }
+function decryptText() { try{ document.getElementById('cryptOutput').textContent = decodeURIComponent(escape(atob(document.getElementById('cryptInput').value))); }catch(e){ document.getElementById('cryptOutput').textContent = "HATA: Geçersiz Base64."; } }
+
+// V2 ORİJİNAL XOX
+let ticBoard = ["", "", "", "", "", "", "", "", ""];
+let ticCurrentPlayer = "X";
+let ticGameActive = true;
+
+function makeTicMove(index) {
+  if(ticBoard[index] === "" && ticGameActive) {
+    ticBoard[index] = ticCurrentPlayer;
+    const cells = document.getElementsByClassName("tic-cell");
+    cells[index].textContent = ticCurrentPlayer;
+    cells[index].style.color = ticCurrentPlayer === "X" ? "#2196F3" : "#f44336";
+    checkTicWin();
+  }
+}
+function checkTicWin() {
+  const winConditions = [
+    [0,1,2], [3,4,5], [6,7,8], // Yatay
+    [0,3,6], [1,4,7], [2,5,8], // Dikey
+    [0,4,8], [2,4,6]           // Çapraz
+  ];
+  let roundWon = false;
+  for(let i=0; i<8; i++) {
+    const [a, b, c] = winConditions[i];
+    if(ticBoard[a] && ticBoard[a] === ticBoard[b] && ticBoard[a] === ticBoard[c]) {
+      roundWon = true; break;
+    }
+  }
+  if(roundWon) {
+    document.getElementById("ticWinner").textContent = `🎉 Kazanan: ${ticCurrentPlayer}!`;
+    ticGameActive = false;
+    return;
+  }
+  if(!ticBoard.includes("")) {
+    document.getElementById("ticWinner").textContent = "Berabere!";
+    document.getElementById("ticWinner").style.color = "#757575";
+    ticGameActive = false;
+    return;
+  }
+  ticCurrentPlayer = ticCurrentPlayer === "X" ? "O" : "X";
+  document.getElementById("xoxTurn").textContent = ticCurrentPlayer;
+  document.getElementById("xoxTurn").style.color = ticCurrentPlayer === "X" ? "#2196F3" : "#f44336";
+}
+function resetTicTacToe() {
+  ticBoard = ["", "", "", "", "", "", "", "", ""];
+  ticCurrentPlayer = "X";
+  ticGameActive = true;
+  document.getElementById("ticWinner").textContent = "";
+  document.getElementById("xoxTurn").textContent = "X";
+  document.getElementById("xoxTurn").style.color = "#2196F3";
+  const cells = document.getElementsByClassName("tic-cell");
+  for(let i=0; i<cells.length; i++) cells[i].textContent = "";
+}
+
+// V2 ORİJİNAL TTS, YAŞ, MORS, KREDİ, LOREM
+function speakText() {
+  const text = document.getElementById('ttsInput').value;
+  if(text !== "") {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'tr-TR'; 
+    speechSynthesis.speak(utterance);
+  }
+}
+
+function calculateExactAge() {
+  const bdayVal = document.getElementById('bdayInput').value;
+  if(!bdayVal) return;
+  
+  const bday = new Date(bdayVal);
+  const today = new Date();
+  
+  let years = today.getFullYear() - bday.getFullYear();
+  let months = today.getMonth() - bday.getMonth();
+  let days = today.getDate() - bday.getDate();
+
+  if(days < 0) {
+    months--;
+    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+  if(months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  if(years < 0) {
+    document.getElementById('ageOutput').textContent = "Gelecekte doğamazsın! :)";
+  } else {
+    document.getElementById('ageOutput').textContent = `Tam Yaşın: ${years} Yıl, ${months} Ay, ${days} Gün`;
+  }
+}
+
+const morseCode = {
+  "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".", "F": "..-.",
+  "G": "--.", "H": "....", "I": "..", "J": ".---", "K": "-.-", "L": ".-..",
+  "M": "--", "N": "-.", "O": "---", "P": ".--.", "Q": "--.-", "R": ".-.",
+  "S": "...", "T": "-", "U": "..-", "V": "...-", "W": ".--", "X": "-..-",
+  "Y": "-.--", "Z": "--..", "1": ".----", "2": "..---", "3": "...--",
+  "4": "....-", "5": ".....", "6": "-....", "7": "--...", "8": "---..",
+  "9": "----.", "0": "-----", " ": "/"
+};
+function translateToMorse() {
+  const input = document.getElementById('morseInput').value.toUpperCase();
+  let output = "";
+  for(let i=0; i<input.length; i++) {
+    const char = input[i];
+    const mappedChar = char === "Ç" ? "C" : char === "Ğ" ? "G" : char === "İ" ? "I" : char === "Ö" ? "O" : char === "Ş" ? "S" : char === "Ü" ? "U" : char;
+    if(morseCode[mappedChar]) {
+      output += morseCode[mappedChar] + " ";
+    }
+  }
+  document.getElementById('morseOutput').textContent = output.trim();
+}
+
+function calculateLoan() {
+  const p = parseFloat(document.getElementById('loanAmount').value); 
+  const r = parseFloat(document.getElementById('loanRate').value) / 100; 
+  const n = parseInt(document.getElementById('loanMonths').value); 
+  
+  if(p > 0 && r > 0 && n > 0) {
+    const mathPow = Math.pow(1 + r, n);
+    const monthlyPayment = (p * r * mathPow) / (mathPow - 1);
+    const totalPayment = monthlyPayment * n;
+    
+    document.getElementById('loanOutput').innerHTML = `
+      Aylık Taksit: <span style="color:#f44336;">${monthlyPayment.toFixed(2)} TL</span><br>
+      Toplam Geri Ödeme: ${totalPayment.toFixed(2)} TL
+    `;
+  } else {
+    document.getElementById('loanOutput').textContent = "Lütfen geçerli değerler girin.";
+  }
+}
+
+const loremWords = ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua", "enim", "ad", "minim", "veniam", "quis", "nostrud", "exercitation", "ullamco", "laboris", "nisi", "ut", "aliquip", "ex", "ea", "commodo", "consequat"];
+function generateLorem() {
+  const count = parseInt(document.getElementById('loremCount').value) || 1;
+  let finalHtml = "";
+  
+  for(let p=0; p<count; p++) {
+    let sentenceCount = Math.floor(Math.random() * 4) + 3; 
+    let paragraph = "";
+    
+    for(let s=0; s<sentenceCount; s++) {
+      let wordCount = Math.floor(Math.random() * 8) + 5; 
+      let sentence = "";
+      for(let w=0; w<wordCount; w++) {
+        let randomWord = loremWords[Math.floor(Math.random() * loremWords.length)];
+        if(w === 0) randomWord = randomWord.charAt(0).toUpperCase() + randomWord.slice(1);
+        sentence += randomWord + (w === wordCount-1 ? "" : " ");
+      }
+      paragraph += sentence + ". ";
+    }
+    finalHtml += `<p>${paragraph}</p>`;
+  }
+  document.getElementById('loremOutput').innerHTML = finalHtml;
+}
+
+
+// ================= EKLENEN YENİ OYUN VE ARAÇLAR =================
+
+// Hafıza Kartları (Memory Game)
+const memEmojis = ['🍎', '🍌', '🍉', '🍇', '🍓', '🥑'];
+let memCards = [], memFlipped = [], memMatched = 0, memMoves = 0, memLock = false;
+
+function initMemoryGame() {
+  const board = document.getElementById('memoryBoard');
+  board.innerHTML = '';
+  memCards = [...memEmojis, ...memEmojis].sort(() => 0.5 - Math.random());
+  memFlipped = []; memMatched = 0; memMoves = 0; memLock = false;
+  document.getElementById('memoryMoves').textContent = `Hamle: ${memMoves}`;
+  
+  memCards.forEach((emoji, index) => {
+    const card = document.createElement('div');
+    card.classList.add('memory-card');
+    card.dataset.emoji = emoji;
+    card.dataset.index = index;
+    card.onclick = () => flipMemCard(card);
+    board.appendChild(card);
+  });
+}
+function flipMemCard(card) {
+  if (memLock || card.classList.contains('flipped')) return;
+  card.classList.add('flipped');
+  card.textContent = card.dataset.emoji;
+  memFlipped.push(card);
+  
+  if (memFlipped.length === 2) {
+    memMoves++;
+    document.getElementById('memoryMoves').textContent = `Hamle: ${memMoves}`;
+    memLock = true;
+    if (memFlipped[0].dataset.emoji === memFlipped[1].dataset.emoji) {
+      memMatched += 2;
+      memFlipped = [];
+      memLock = false;
+      if(memMatched === memCards.length) setTimeout(() => alert(`Tebrikler! ${memMoves} hamlede bitirdin.`), 300);
+    } else {
+      setTimeout(() => {
+        memFlipped[0].classList.remove('flipped'); memFlipped[0].textContent = '';
+        memFlipped[1].classList.remove('flipped'); memFlipped[1].textContent = '';
+        memFlipped = [];
+        memLock = false;
+      }, 1000);
+    }
+  }
+}
+initMemoryGame();
+
+// Taş Kağıt Makas (Rock Paper Scissors)
+let rpsP = 0, rpsC = 0;
+function playRPS(player) {
+  const choices = ['Taş', 'Kağıt', 'Makas'];
+  const comp = choices[Math.floor(Math.random() * 3)];
+  let res = "";
+  if (player === comp) res = "Berabere!";
+  else if ((player === "Taş" && comp === "Makas") || (player === "Kağıt" && comp === "Taş") || (player === "Makas" && comp === "Kağıt")) {
+    res = "Kazandın!"; rpsP++;
+  } else {
+    res = "Bilgisayar Kazandı!"; rpsC++;
+  }
+  document.getElementById('rpsResult').textContent = `Sen: ${player} | Bilgisayar: ${comp} -> ${res}`;
+  document.getElementById('rpsPlayerScore').textContent = rpsP;
+  document.getElementById('rpsCompScore').textContent = rpsC;
+}
+function resetRPS() { rpsP = 0; rpsC = 0; document.getElementById('rpsPlayerScore').textContent = 0; document.getElementById('rpsCompScore').textContent = 0; document.getElementById('rpsResult').textContent = ""; }
+
+// Pomodoro Sayacı
+let pomoTime = 25 * 60, pomoInt, pomoRunning = false;
+function updatePomoDisp() {
+  let m = Math.floor(pomoTime / 60), s = pomoTime % 60;
+  document.getElementById('pomoDisplay').textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+function startPomodoro() {
+  if (pomoRunning) { clearInterval(pomoInt); pomoRunning = false; return; }
+  pomoRunning = true;
+  pomoInt = setInterval(() => {
+    if(pomoTime > 0) { pomoTime--; updatePomoDisp(); }
+    else { clearInterval(pomoInt); pomoRunning = false; alert("Süre bitti!"); }
+  }, 1000);
+}
+function switchPomodoro(mins) {
+  clearInterval(pomoInt); pomoRunning = false;
+  pomoTime = mins * 60; updatePomoDisp();
+  document.getElementById('pomoDisplay').style.color = mins === 25 ? "#d32f2f" : "#4CAF50";
+}
+
+// Yazım Hızı Testi (WPM)
+let typStart = null, typTimer = null;
+function checkTyping() {
+  if (!typStart) typStart = Date.now();
+  const target = document.getElementById('typingTarget').textContent;
+  const input = document.getElementById('typingInput').value;
+  
+  if (input === target) {
+    const timeTaken = (Date.now() - typStart) / 1000 / 60; 
+    const wpm = Math.round((target.length / 5) / timeTaken);
+    document.getElementById('typingResult').textContent = `Mükemmel! Hızınız: ${wpm} WPM`;
+    typStart = null;
+  } else if (target.startsWith(input)) {
+    document.getElementById('typingInput').style.backgroundColor = "#e8f5e9";
+  } else {
+    document.getElementById('typingInput').style.backgroundColor = "#ffebee";
+  }
+}
+function resetTypingTest() {
+  document.getElementById('typingInput').value = "";
+  document.getElementById('typingInput').style.backgroundColor = "#fff";
+  document.getElementById('typingResult').textContent = "";
+  typStart = null;
+}
+
+// Çekiliş Aracı
+function drawRaffle() {
+  const text = document.getElementById('raffleInput').value;
+  const names = text.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+  if (names.length > 0) {
+    const winner = names[Math.floor(Math.random() * names.length)];
+    document.getElementById('raffleWinner').textContent = `🎉 Kazanan: ${winner} 🎉`;
+  } else {
+    document.getElementById('raffleWinner').textContent = "Lütfen isim girin.";
+  }
+}
+
+// Harf Dönüştürücü
+function convertCase(type) {
+  let val = document.getElementById('caseInput').value;
+  if(type === 'upper') val = val.toUpperCase();
+  if(type === 'lower') val = val.toLowerCase();
+  if(type === 'title') val = val.toLowerCase().replace(/\b\w/g, s => s.toUpperCase());
+  document.getElementById('caseInput').value = val;
+}
+
+// KDV Hesaplayıcı
+function calcVat(isAdding) {
+  const p = parseFloat(document.getElementById('vatPrice').value);
+  const r = parseFloat(document.getElementById('vatRate').value);
+  if(p > 0) {
+    let result = 0;
+    if(isAdding) {
+      result = p + (p * r / 100);
+      document.getElementById('vatResult').textContent = `KDV Dahil Tutar: ${result.toFixed(2)} TL`;
+    } else {
+      result = p / (1 + (r / 100));
+      document.getElementById('vatResult').textContent = `KDV Hariç Tutar: ${result.toFixed(2)} TL`;
+    }
+  }
+}
+
+// Yüzde Hesaplayıcı
+function calcPercent() {
+  const a = parseFloat(document.getElementById('pctA').value);
+  const b = parseFloat(document.getElementById('pctB').value);
+  if(!isNaN(a) && !isNaN(b)) {
+    const res = (a * b) / 100;
+    document.getElementById('pctResult').textContent = `Sonuç: ${res}`;
+  }
+}
+
+// RGB-HEX Renk Simülatörü
+function updateRgb() {
+  const r = document.getElementById('rgbR').value;
+  const g = document.getElementById('rgbG').value;
+  const b = document.getElementById('rgbB').value;
+  
+  document.getElementById('valR').textContent = r;
+  document.getElementById('valG').textContent = g;
+  document.getElementById('valB').textContent = b;
+  
+  const hex = "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+  
+  document.getElementById('rgbPreview').style.backgroundColor = `rgb(${r},${g},${b})`;
+  document.getElementById('rgbHexOutput').textContent = hex;
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft 4K - HTML5 / JavaScript Orijinal Sürüm</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            color: #fff;
+        }
+        #game-canvas {
+            width: 100vw;
+            height: 100vh;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+        }
+        
+        /* Ekran Ortası Nişangah (Crosshair) */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 2px #000;
+        }
+        #crosshair::before {
+            left: 5px; top: 0; width: 2px; height: 12px;
+        }
+        #crosshair::after {
+            left: 0; top: 5px; width: 12px; height: 2px;
+        }
+
+        /* Başlangıç / Pause Ekranı */
+        #overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            cursor: pointer;
+            text-align: center;
+        }
+        #overlay h1 {
+            font-size: 42px;
+            color: #55ff55;
+            text-shadow: 3px 3px #000;
+            margin-bottom: 15px;
+            letter-spacing: 2px;
+        }
+        #overlay p {
+            font-size: 16px;
+            color: #ddd;
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+        #overlay .btn {
+            margin-top: 25px;
+            padding: 12px 28px;
+            background: #4a8505;
+            border: 2px solid #a2e048;
+            color: #fff;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 4px;
+            box-shadow: 0 4px 0 #2a4c03;
+        }
+
+        /* Hotbar (Arayüz) */
+        #hotbar-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 6px;
+            border: 2px solid #444;
+            border-radius: 6px;
+            z-index: 10;
+        }
+        .slot {
+            width: 44px;
+            height: 44px;
+            border: 2px solid #555;
+            background: rgba(250, 250, 250, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            font-weight: bold;
+            font-size: 12px;
+            color: #fff;
+        }
+        .slot.active {
+            border: 3px solid #ffcc00;
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+        .slot-num {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 10px;
+            color: #aaa;
+        }
+        .slot-canvas {
+            width: 28px;
+            height: 28px;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="crosshair"></div>
+
+    <div id="overlay">
+        <h1>MINECRAFT 4K</h1>
+        <p><b>Fare Tıklaması:</b> Oyuna Başla / Fareyi Kilitle</p>
+        <p><b>WASD:</b> Hareket Edip Yürü | <b>SPACE:</b> Zıpla</p>
+        <p><b>Sol Tık:</b> Blok Kır | <b>Sağ Tık:</b> Blok Koy</p>
+        <p><b>1 - 6 Tuşları / Fare Tekerleği:</b> Blok Değiştir</p>
+        <div class="btn">OYUNA BAŞLA</div>
+    </div>
+
+    <div id="hotbar-container">
+        <div class="slot active" data-slot="1"><span class="slot-num">1</span><canvas class="slot-canvas" id="sc1"></canvas></div>
+        <div class="slot" data-slot="2"><span class="slot-num">2</span><canvas class="slot-canvas" id="sc2"></canvas></div>
+        <div class="slot" data-slot="3"><span class="slot-num">3</span><canvas class="slot-canvas" id="sc3"></canvas></div>
+        <div class="slot" data-slot="4"><span class="slot-num">4</span><canvas class="slot-canvas" id="sc4"></canvas></div>
+        <div class="slot" data-slot="5"><span class="slot-num">5</span><canvas class="slot-canvas" id="sc5"></canvas></div>
+        <div class="slot" data-slot="6"><span class="slot-num">6</span><canvas class="slot-canvas" id="sc6"></canvas></div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+<script>
+/**
+ * MINECRAFT 4K (HTML5 JavaScript Voxel Engine)
+ * Notch'un 2009 Java 4K sürümüne sadık kalınarak hazırlanmıştır.
+ */
+
+// --- 1. AYARLAR VE CANVAS KURULUMU ---
+const W = 280; // Düşük çözünürlüklü piksel render genişliği
+const H = 158; // Düşük çözünürlüklü piksel render yüksekliği
+
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = W;
+canvas.height = H;
+
+const imgData = ctx.createImageData(W, H);
+const buf32 = new Uint32Array(imgData.data.buffer);
+
+// Dünya Haritası: 64 x 64 x 64 Voksel Matrisi
+const MAP_SIZE = 64;
+const map = new Uint8Array(MAP_SIZE * MAP_SIZE * MAP_SIZE);
+
+// Blok Türleri
+const BLOCKS = {
+    AIR: 0,
+    GRASS: 1,
+    DIRT: 2,
+    STONE: 3,
+    BRICK: 4,
+    WOOD: 5,
+    LEAVES: 6
+};
+
+let activeBlock = BLOCKS.GRASS;
+
+function getBlock(x, y, z) {
+    if (x < 0 || x >= 64 || y < 0 || y >= 64 || z < 0 || z >= 64) return BLOCKS.AIR;
+    return map[x + (y << 6) + (z << 12)];
+}
+
+function setBlock(x, y, z, val) {
+    if (x >= 0 && x < 64 && y >= 0 && y < 64 && z >= 0 && z < 64) {
+        map[x + (y << 6) + (z << 12)] = val;
+    }
+}
+
+// --- 2. SES SENTEZLEYİCİ (Web Audio API) ---
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSound(type) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'break') { // Blok Kırma Sesi
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+    } else if (type === 'place') { // Blok Koyma Sesi
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.08);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+    } else if (type === 'jump') { // Zıplama Sesi
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.15);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+    }
+}
+
+// --- 3. DOKU ÜRETİCİSİ (16x16 Orijinal MC 4K Algoritması) ---
+const textures = [];
+
+function initTextures() {
+    for (let b = 1; b <= 6; b++) {
+        textures[b] = [];
+        for (let face = 0; face < 3; face++) { // 0: Üst, 1: Alt, 2: Yan
+            const tex = new Uint32Array(256);
+            for (let y = 0; y < 16; y++) {
+                for (let x = 0; x < 16; x++) {
+                    let r = 0, g = 0, bl = 0;
+                    let n = ((Math.random() * 32) - 16) | 0; // Rastgele gürültü
+
+                    if (b === BLOCKS.GRASS) {
+                        if (face === 0) { // Üst Çim
+                            r = 90 + n; g = 160 + n; bl = 40 + n;
+                        } else if (face === 1) { // Alt Toprak
+                            r = 115 + n; g = 80 + n; bl = 50 + n;
+                        } else { // Yan Taraf (Çim Geçişli)
+                            if (y < 3 + ((Math.random() * 2) | 0)) {
+                                r = 90 + n; g = 160 + n; bl = 40 + n;
+                            } else {
+                                r = 115 + n; g = 80 + n; bl = 50 + n;
+                            }
+                        }
+                    } else if (b === BLOCKS.DIRT) {
+                        r = 115 + n; g = 80 + n; bl = 50 + n;
+                    } else if (b === BLOCKS.STONE) {
+                        let s = 110 + n; r = s; g = s; bl = s;
+                    } else if (b === BLOCKS.BRICK) {
+                        let isMortar = (y % 4 === 0) || ((y < 4 || (y >= 8 && y < 12)) ? x % 8 === 0 : (x + 4) % 8 === 0);
+                        if (isMortar) {
+                            r = 170 + (n >> 1); g = 160 + (n >> 1); bl = 150 + (n >> 1);
+                        } else {
+                            r = 160 + n; g = 50 + n; bl = 40 + n;
+                        }
+                    } else if (b === BLOCKS.WOOD) {
+                        if (face === 0 || face === 1) {
+                            r = 140 + n; g = 110 + n; bl = 60 + n;
+                        } else {
+                            r = 100 + n; g = 65 + n; bl = 30 + n;
+                        }
+                    } else if (b === BLOCKS.LEAVES) {
+                        if (Math.random() > 0.22) {
+                            r = 40 + n; g = 125 + n; bl = 30 + n;
+                        } else {
+                            r = 15 + n; g = 50 + n; bl = 10 + n;
+                        }
+                    }
+
+                    r = Math.min(255, Math.max(0, r));
+                    g = Math.min(255, Math.max(0, g));
+                    bl = Math.min(255, Math.max(0, bl));
+
+                    // ABGR Formatında Uint32 Renk
+                    tex[x + y * 16] = (255 << 24) | (bl << 16) | (g << 8) | r;
+                }
+            }
+            textures[b][face] = tex;
+        }
+    }
+}
+
+// Hotbar İkonlarını Çizdirme
+function renderHotbarIcons() {
+    for (let b = 1; b <= 6; b++) {
+        const slotCanvas = document.getElementById(`sc${b}`);
+        const sCtx = slotCanvas.getContext('2d');
+        slotCanvas.width = 16;
+        slotCanvas.height = 16;
+        const sImg = sCtx.createImageData(16, 16);
+        const sBuf = new Uint32Array(sImg.data.buffer);
+        const tex = textures[b][0]; // Üst yüzey dokusu
+        for (let i = 0; i < 256; i++) sBuf[i] = tex[i];
+        sCtx.putImageData(sImg, 0, 0);
+    }
+}
+
+// --- 4. RASTGELE HARİTA OLUŞTURUCU (Minecraft 4K Algoritması) ---
+function generateWorld() {
+    for (let x = 0; x < 64; x++) {
+        for (let z = 0; z < 64; z++) {
+            // Sinüs/Kosinüs Arazi Yükseklik Fonksiyonu
+            let h = (14 + Math.sin(x * 0.12) * 4.5 + Math.cos(z * 0.12) * 4.5 + Math.sin((x + z) * 0.18) * 3) | 0;
+
+            for (let y = 0; y < 64; y++) {
+                if (y < h - 4) {
+                    setBlock(x, y, z, BLOCKS.STONE); // Derinlikler Taş
+                } else if (y < h - 1) {
+                    // Karışık Alt Katman (Toprak, Tuğla, Odun)
+                    let rnd = Math.random();
+                    if (rnd < 0.1) setBlock(x, y, z, BLOCKS.BRICK);
+                    else if (rnd < 0.18) setBlock(x, y, z, BLOCKS.WOOD);
+                    else setBlock(x, y, z, BLOCKS.DIRT);
+                } else if (y === h - 1) {
+                    // Yüzey Çeşitliliği (Orijinal MC 4K Rastgeleciliği)
+                    let rnd = Math.random();
+                    if (rnd < 0.22) setBlock(x, y, z, BLOCKS.BRICK);
+                    else if (rnd < 0.32) setBlock(x, y, z, BLOCKS.LEAVES);
+                    else if (rnd < 0.40) setBlock(x, y, z, BLOCKS.STONE);
+                    else setBlock(x, y, z, BLOCKS.GRASS);
+                }
+            }
+        }
+    }
+}
+
+// --- 5. OYUNCU FİZİĞİ & KONTROLLER ---
+let posX = 32.5, posY = 30.0, posZ = 32.5;
+let velX = 0, velY = 0, velZ = 0;
+let yaw = 0, pitch = 0;
+let onGround = false;
+const eyeHeight = 1.45;
+const keys = {};
+
+const overlay = document.getElementById('overlay');
+
+overlay.addEventListener('click', () => {
+    initAudio();
+    canvas.requestPointerLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement === canvas) {
+        overlay.style.display = 'none';
+    } else {
+        overlay.style.display = 'flex';
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.key >= '1' && e.key <= '6') {
+        selectSlot(parseInt(e.key));
+    }
+});
+
+document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+document.addEventListener('wheel', (e) => {
+    let nextSlot = activeBlock + (e.deltaY > 0 ? 1 : -1);
+    if (nextSlot > 6) nextSlot = 1;
+    if (nextSlot < 1) nextSlot = 6;
+    selectSlot(nextSlot);
+});
+
+function selectSlot(slotNum) {
+    activeBlock = slotNum;
+    document.querySelectorAll('.slot').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.slot[data-slot="${slotNum}"]`).classList.add('active');
+}
+
+document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === canvas) {
+        yaw += e.movementX * 0.0028;
+        pitch -= e.movementY * 0.0028;
+        pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, pitch));
+    }
+});
+
+document.addEventListener('mousedown', (e) => {
+    if (document.pointerLockElement !== canvas) return;
+    const hit = raycastTarget();
+    if (hit) {
+        if (e.button === 0) { // Sol Tık: Blok Kır
+            setBlock(hit.bx, hit.by, hit.bz, BLOCKS.AIR);
+            playSound('break');
+        } else if (e.button === 2) { // Sağ Tık: Blok Koy
+            let nx = hit.bx + hit.nx;
+            let ny = hit.by + hit.ny;
+            let nz = hit.bz + hit.nz;
+
+            // Oyuncunun gövdesiyle çakışmayı önle
+            let pMinX = posX - 0.3, pMaxX = posX + 0.3;
+            let pMinY = posY - eyeHeight, pMaxY = posY + 0.2;
+            let pMinZ = posZ - 0.3, pMaxZ = posZ + 0.3;
+
+            let intersectsPlayer = (nx >= pMinX && nx <= pMaxX) &&
+                                   (ny >= pMinY && ny <= pMaxY) &&
+                                   (nz >= pMinZ && nz <= pMaxZ);
+
+            if (!intersectsPlayer) {
+                setBlock(nx, ny, nz, activeBlock);
+                playSound('place');
+            }
+        }
+    }
+});
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Katı Blok Çarpışma Testi
+function isSolid(x, y, z) {
+    let r = 0.28;
+    return getBlock(Math.floor(x - r), Math.floor(y), Math.floor(z - r)) > 0 ||
+           getBlock(Math.floor(x + r), Math.floor(y), Math.floor(z - r)) > 0 ||
+           getBlock(Math.floor(x - r), Math.floor(y), Math.floor(z + r)) > 0 ||
+           getBlock(Math.floor(x + r), Math.floor(y), Math.floor(z + r)) > 0;
+}
+
+function updatePhysics() {
+    // Yerçekimi
+    velY -= 0.0075;
+
+    const speed = 0.065;
+    const cosY = Math.sin(yaw), sinY = Math.cos(yaw);
+    let moveX = 0, moveZ = 0;
+
+    if (keys['KeyW']) { moveX += cosY * speed; moveZ += sinY * speed; }
+    if (keys['KeyS']) { moveX -= cosY * speed; moveZ -= sinY * speed; }
+    if (keys['KeyA']) { moveX += sinY * speed; moveZ -= cosY * speed; }
+    if (keys['KeyD']) { moveX -= sinY * speed; moveZ += cosY * speed; }
+
+    // Zıplama
+    if (keys['Space'] && onGround) {
+        velY = 0.14;
+        onGround = false;
+        playSound('jump');
+    }
+
+    // X Ekseni Çarpışması
+    let nextX = posX + moveX;
+    if (!isSolid(nextX, posY - eyeHeight + 0.1, posZ) && !isSolid(nextX, posY - 0.2, posZ)) {
+        posX = nextX;
+    }
+
+    // Z Ekseni Çarpışması
+    let nextZ = posZ + moveZ;
+    if (!isSolid(posX, posY - eyeHeight + 0.1, nextZ) && !isSolid(posX, posY - 0.2, nextZ)) {
+        posZ = nextZ;
+    }
+
+    // Y Ekseni (Düşme/Zıplama) Çarpışması
+    let nextY = posY + velY;
+    if (velY < 0) { // Düşüyor
+        if (isSolid(posX, nextY - eyeHeight, posZ)) {
+            posY = Math.floor(nextY - eyeHeight) + 1 + eyeHeight;
+            velY = 0;
+            onGround = true;
+        } else {
+            posY = nextY;
+            onGround = false;
+        }
+    } else if (velY > 0) { // Yükseliyor
+        if (isSolid(posX, nextY + 0.2, posZ)) {
+            velY = 0;
+        } else {
+            posY = nextY;
+            onGround = false;
+        }
+    }
+}
+
+function spawnPlayer() {
+    for (let y = 60; y > 0; y--) {
+        if (getBlock(32, y, 32) > 0) {
+            posY = y + 1 + eyeHeight;
+            break;
+        }
+    }
+}
+
+// --- 6. RAYCASTING HEDEF TESPİTİ (Blok Kırma/Koyma İçin) ---
+function raycastTarget() {
+    const cosY = Math.sin(yaw), sinY = Math.cos(yaw);
+    const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+
+    const dx = cosP * cosY, dy = sinP, dz = cosP * sinY;
+
+    let px = posX, py = posY, pz = posZ;
+    let mapX = Math.floor(px), mapY = Math.floor(py), mapZ = Math.floor(pz);
+
+    let deltaX = Math.abs(1 / dx), deltaY = Math.abs(1 / dy), deltaZ = Math.abs(1 / dz);
+    let stepX = dx < 0 ? -1 : 1, stepY = dy < 0 ? -1 : 1, stepZ = dz < 0 ? -1 : 1;
+
+    let sideX = dx < 0 ? (px - mapX) * deltaX : (mapX + 1.0 - px) * deltaX;
+    let sideY = dy < 0 ? (py - mapY) * deltaY : (mapY + 1.0 - py) * deltaY;
+    let sideZ = dz < 0 ? (pz - mapZ) * deltaZ : (mapZ + 1.0 - pz) * deltaZ;
+
+    let side = 0;
+    for (let i = 0; i < 40; i++) {
+        if (sideX < sideY && sideX < sideZ) { sideX += deltaX; mapX += stepX; side = 0; }
+        else if (sideY < sideZ) { sideY += deltaY; mapY += stepY; side = 1; }
+        else { sideZ += deltaZ; mapZ += stepZ; side = 2; }
+
+        let b = getBlock(mapX, mapY, mapZ);
+        if (b > 0) {
+            return {
+                bx: mapX, by: mapY, bz: mapZ,
+                nx: side === 0 ? -stepX : 0,
+                ny: side === 1 ? -stepY : 0,
+                nz: side === 2 ? -stepZ : 0
+            };
+        }
+    }
+    return null;
+}
+
+// --- 7. DDA VOXEL RAYCASTING ENGINE (Ana Render Motoru) ---
+function render() {
+    updatePhysics();
+
+    const targetHit = raycastTarget();
+
+    const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+    const cosY = Math.sin(yaw), sinY = Math.cos(yaw);
+
+    // Vektör Yönleri
+    const fwX = cosP * cosY, fwY = sinP, fwZ = cosP * sinY;
+    const rtX = -sinY, rtY = 0, rtZ = cosY;
+    const upX = -sinP * cosY, upY = cosP, upZ = -sinP * sinY;
+
+    let idx = 0;
+    for (let y = 0; y < H; y++) {
+        const screenY = (1.0 - (2.0 * y) / H);
+        for (let x = 0; x < W; x++) {
+            const screenX = ((2.0 * x) / W - 1.0) * (W / H);
+
+            let dx = fwX + (rtX * screenX + upX * screenY);
+            let dy = fwY + (rtY * screenX + upY * screenY);
+            let dz = fwZ + (rtZ * screenX + upZ * screenY);
+
+            let len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            dx /= len; dy /= len; dz /= len;
+
+            let mapX = Math.floor(posX), mapY = Math.floor(posY), mapZ = Math.floor(posZ);
+            let deltaX = Math.abs(1 / dx), deltaY = Math.abs(1 / dy), deltaZ = Math.abs(1 / dz);
+            let stepX = dx < 0 ? -1 : 1, stepY = dy < 0 ? -1 : 1, stepZ = dz < 0 ? -1 : 1;
+
+            let sideX = dx < 0 ? (posX - mapX) * deltaX : (mapX + 1.0 - posX) * deltaX;
+            let sideY = dy < 0 ? (posY - mapY) * deltaY : (mapY + 1.0 - posY) * deltaY;
+            let sideZ = dz < 0 ? (posZ - mapZ) * deltaZ : (mapZ + 1.0 - posZ) * deltaZ;
+
+            let hitBlock = 0, side = 0, dist = 0;
+            const maxDist = 42;
+
+            while (dist < maxDist) {
+                if (sideX < sideY && sideX < sideZ) {
+                    dist = sideX; sideX += deltaX; mapX += stepX; side = 0;
+                } else if (sideY < sideZ) {
+                    dist = sideY; sideY += deltaY; mapY += stepY; side = 1;
+                } else {
+                    dist = sideZ; sideZ += deltaZ; mapZ += stepZ; side = 2;
+                }
+
+                hitBlock = getBlock(mapX, mapY, mapZ);
+                if (hitBlock > 0) break;
+            }
+
+            if (hitBlock > 0 && dist < maxDist) {
+                let u = 0, v = 0, faceType = 2, shade = 0.7;
+
+                if (side === 0) { // X Yüzeyi
+                    let hitZ = posZ + dist * dz;
+                    let hitY = posY + dist * dy;
+                    u = hitZ - Math.floor(hitZ);
+                    v = 1.0 - (hitY - Math.floor(hitY));
+                    shade = 0.75;
+                } else if (side === 1) { // Y Yüzeyi (Üst/Alt)
+                    let hitX = posX + dist * dx;
+                    let hitZ = posZ + dist * dz;
+                    u = hitX - Math.floor(hitX);
+                    v = hitZ - Math.floor(hitZ);
+                    faceType = stepY < 0 ? 0 : 1;
+                    shade = stepY < 0 ? 1.0 : 0.4;
+                } else { // Z Yüzeyi
+                    let hitX = posX + dist * dx;
+                    let hitY = posY + dist * dy;
+                    u = hitX - Math.floor(hitX);
+                    v = 1.0 - (hitY - Math.floor(hitY));
+                    shade = 0.6;
+                }
+
+                let texU = Math.floor(u * 16) & 15;
+                let texV = Math.floor(v * 16) & 15;
+                let col = textures[hitBlock][faceType][texU + texV * 16];
+
+                let r = (col & 0xff) * shade;
+                let g = ((col >> 8) & 0xff) * shade;
+                let b = ((col >> 16) & 0xff) * shade;
+
+                // Hedef Blok Beyaz Vurgulama Çerçevesi
+                if (targetHit && targetHit.bx === mapX && targetHit.by === mapY && targetHit.bz === mapZ) {
+                    if (u < 0.06 || u > 0.94 || v < 0.06 || v > 0.94) {
+                        r = Math.min(255, r + 90);
+                        g = Math.min(255, g + 90);
+                        b = Math.min(255, b + 90);
+                    }
+                }
+
+                // Siyah Sis / Gece Derinliği (Minecraft 4K İmzası)
+                let fog = Math.min(1.0, dist / maxDist);
+                fog = fog * fog; // Yumuşak geçiş
+                r = r * (1 - fog);
+                g = g * (1 - fog);
+                b = b * (1 - fog);
+
+                buf32[idx++] = (255 << 24) | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
+            } else {
+                // MC 4K Karanlık Siyah Uzay
+                buf32[idx++] = (255 << 24);
+            }
+        }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    requestAnimationFrame(render);
+}
+
+// Oyunu Başlat
+initTextures();
+renderHotbarIcons();
+generateWorld();
+spawnPlayer();
+requestAnimationFrame(render);
+</script>
+
+</body>
+</html>

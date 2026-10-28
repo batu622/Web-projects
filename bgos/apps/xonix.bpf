@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xonix - Classic Retro</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #050810;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+        }
+
+        /* KolibriOS / Retro Pencere Çerçevesi */
+        .window {
+            background-color: #d4d0c8;
+            border: 2px solid #ffffff;
+            border-right-color: #404040;
+            border-bottom-color: #404040;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            width: 660px;
+        }
+
+        /* Başlık Çubuğu */
+        .title-bar {
+            background: linear-gradient(to right, #000080, #1084d0);
+            height: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px 0 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .win-controls {
+            display: flex;
+            gap: 2px;
+        }
+
+        .win-btn {
+            width: 14px;
+            height: 14px;
+            background-color: #c0c0c0;
+            border: 1px solid #ffffff;
+            border-right-color: #404040;
+            border-bottom-color: #404040;
+            color: #000;
+            font-size: 9px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        /* Türkçe Skor & Durum Çubuğu */
+        .hud-bar {
+            background-color: #0000a8;
+            color: #00ffff;
+            padding: 4px 10px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            border: 2px solid #000080;
+            display: flex;
+            justify-content: flex-start;
+            gap: 15px;
+        }
+
+        .game-wrapper {
+            background-color: #000;
+            padding: 2px;
+            display: flex;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            background-color: #000000;
+            image-rendering: pixelated;
+        }
+
+        .controls-hint {
+            background-color: #d4d0c8;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-top: 1px solid #808080;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            color: #000000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="window">
+    <div class="title-bar">
+        <span>Xonix for KolibriOS</span>
+        <div class="win-controls">
+            <div class="win-btn" onclick="restartGame()">R</div>
+            <div class="win-btn" style="background:#f05050; color:#fff;" onclick="restartGame()">X</div>
+        </div>
+    </div>
+
+    <!-- Üst Türkçe Bilgi Çubuğu -->
+    <div class="hud-bar" id="hudBar">
+        Seviye 1, tamamlandı %0, can: 3, skor: 0
+    </div>
+
+    <div class="game-wrapper">
+        <canvas id="gameCanvas" width="640" height="400"></canvas>
+    </div>
+
+    <div class="controls-hint">
+        <span>[YÖN TUŞLARI / WASD]: Hareket Et</span>
+        <span>[R]: Yeniden Başlat</span>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const hudBar = document.getElementById('hudBar');
+
+    // Izgara Ayarları
+    const COLS = 64;
+    const ROWS = 40;
+    const CELL_SIZE = 10;
+
+    // Hücre Tipleri
+    const SEA = 0;   // Biçilmemiş / Siyah Alan
+    const LAND = 1;  // Güvenli / Kareli Açık Gri Alan
+    const TRAIL = 2; // Oyuncunun Bıraktığı Mavi İz
+
+    let grid = [];
+    let player = { x: 0, y: 0, vx: 0, vy: 0, isDrawing: false };
+    let trail = [];
+    let seaEnemies = [];  // Turuncu Düşmanlar (Siyah Alanda)
+    let landEnemies = []; // Kırmızı Düşmanlar (Gri Alanda)
+
+    let level = 1;
+    let lives = 3;
+    let score = 0;
+    let completedPercent = 0;
+    let totalSeaTiles = 0;
+    let gameLoopId = null;
+
+    // Oyun Başlatma
+    function initGame() {
+        level = 1;
+        lives = 3;
+        score = 0;
+        startLevel();
+    }
+
+    function startLevel() {
+        grid = Array.from({ length: ROWS }, () => Array(COLS).fill(SEA));
+        
+        // Dış Çerçeveyi Güvenli Kara (LAND) Yap (2 Birim Kalınlık)
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (r < 2 || r >= ROWS - 2 || c < 2 || c >= COLS - 2) {
+                    grid[r][c] = LAND;
+                }
+            }
+        }
+
+        // Toplam deniz (siyah) hücre sayısı
+        totalSeaTiles = 0;
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (grid[r][c] === SEA) totalSeaTiles++;
+            }
+        }
+
+        // Oyuncu Başlangıç Konumu
+        player.x = Math.floor(COLS / 2);
+        player.y = 0;
+        player.vx = 0;
+        player.vy = 0;
+        player.isDrawing = false;
+        trail = [];
+
+        // Düşmanları Oluştur
+        seaEnemies = [];
+        landEnemies = [];
+
+        // Deniz Düşmanları (Turuncu) - Seviye arttıkça çoğalır
+        const numSeaEnemies = 1 + level;
+        for (let i = 0; i < numSeaEnemies; i++) {
+            seaEnemies.push({
+                x: (5 + Math.random() * (COLS - 10)) * CELL_SIZE,
+                y: (5 + Math.random() * (ROWS - 10)) * CELL_SIZE,
+                vx: (Math.random() < 0.5 ? 2 : -2),
+                vy: (Math.random() < 0.5 ? 2 : -2),
+                size: 8
+            });
+        }
+
+        // Kara Düşmanları (Kırmızı) - Dış çerçevede gezinen düşmanlar
+        const numLandEnemies = Math.min(level, 3);
+        for (let i = 0; i < numLandEnemies; i++) {
+            landEnemies.push({
+                x: (2 + i * 15) * CELL_SIZE,
+                y: 1 * CELL_SIZE,
+                vx: 2,
+                vy: 0,
+                size: 8
+            });
+        }
+
+        updatePercent();
+        updateHUD();
+    }
+
+    function updateHUD() {
+        hudBar.innerText = `Seviye ${level}, tamamlandı %${completedPercent}, can: ${lives}, skor: ${score}`;
+    }
+
+    function updatePercent() {
+        let currentSea = 0;
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (grid[r][c] === SEA) currentSea++;
+            }
+        }
+        let cleared = totalSeaTiles - currentSea;
+        completedPercent = Math.min(100, Math.floor((cleared / totalSeaTiles) * 100));
+    }
+
+    // Tuş Kontrolleri
+    window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'arrowleft' || key === 'a') { player.vx = -1; player.vy = 0; }
+        else if (key === 'arrowright' || key === 'd') { player.vx = 1; player.vy = 0; }
+        else if (key === 'arrowup' || key === 'w') { player.vx = 0; player.vy = -1; }
+        else if (key === 'arrowdown' || key === 's') { player.vx = 0; player.vy = 1; }
+        else if (key === 'r') { restartGame(); }
+    });
+
+    // Oyuncu Güncelleme Logic
+    function updatePlayer() {
+        if (player.vx === 0 && player.vy === 0) return;
+
+        let nextX = player.x + player.vx;
+        let nextY = player.y + player.vy;
+
+        // Harita Sınırları Kontrolü
+        if (nextX < 0 || nextX >= COLS || nextY < 0 || nextY >= ROWS) {
+            player.vx = 0;
+            player.vy = 0;
+            return;
+        }
+
+        player.x = nextX;
+        player.y = nextY;
+
+        let currentTile = grid[player.y][player.x];
+
+        // Siyah Alana Girildiyse İz Bırak
+        if (currentTile === SEA) {
+            grid[player.y][player.x] = TRAIL;
+            trail.push({ r: player.y, c: player.x });
+            player.isDrawing = true;
+        } 
+        // Kendi İzine Çarptıysa Can Kaybet
+        else if (currentTile === TRAIL) {
+            handleDeath();
+            return;
+        } 
+        // Güvenli Karaya (LAND) Geri Dündüyse Alanı Kapla
+        else if (currentTile === LAND && player.isDrawing) {
+            captureArea();
+        }
+    }
+
+    // Düşman Hareketi & Çarpışma Kontrolü
+    function updateEnemies() {
+        // 1. Deniz Düşmanları (Turuncu)
+        for (let enemy of seaEnemies) {
+            let nextX = enemy.x + enemy.vx;
+            let nextY = enemy.y + enemy.vy;
+
+            let gridX = Math.floor(nextX / CELL_SIZE);
+            let gridY = Math.floor(nextY / CELL_SIZE);
+
+            // Duvarlardan Sephysics (LAND karosuna çarpınca sekme)
+            if (gridY >= 0 && gridY < ROWS && gridX >= 0 && gridX < COLS) {
+                if (grid[gridY][Math.floor(enemy.x / CELL_SIZE)] === LAND) enemy.vy *= -1;
+                if (grid[Math.floor(enemy.y / CELL_SIZE)][gridX] === LAND) enemy.vx *= -1;
+            } else {
+                enemy.vx *= -1;
+                enemy.vy *= -1;
+            }
+
+            enemy.x += enemy.vx;
+            enemy.y += enemy.vy;
+
+            // İz Kontrolü: Düşman Mavi İze Çarptı mı?
+            let eGridX = Math.floor(enemy.x / CELL_SIZE);
+            let eGridY = Math.floor(enemy.y / CELL_SIZE);
+
+            if (eGridY >= 0 && eGridY < ROWS && eGridX >= 0 && eGridX < COLS) {
+                if (grid[eGridY][eGridX] === TRAIL) {
+                    handleDeath();
+                    return;
+                }
+            }
+        }
+
+        // 2. Kara Düşmanları (Kırmızı)
+        for (let enemy of landEnemies) {
+            let nextX = enemy.x + enemy.vx;
+            let nextY = enemy.y + enemy.vy;
+
+            let gridX = Math.floor(nextX / CELL_SIZE);
+            let gridY = Math.floor(nextY / CELL_SIZE);
+
+            if (gridY >= 0 && gridY < ROWS && gridX >= 0 && gridX < COLS) {
+                if (grid[gridY][gridX] !== LAND) {
+                    enemy.vx *= -1;
+                    enemy.vy *= -1;
+                }
+            } else {
+                enemy.vx *= -1;
+                enemy.vy *= -1;
+            }
+
+            enemy.x += enemy.vx;
+            enemy.y += enemy.vy;
+
+            // Oyuncu Karadayken Çarpışma
+            let playerPixelX = player.x * CELL_SIZE;
+            let playerPixelY = player.y * CELL_SIZE;
+            let dist = Math.hypot(enemy.x - playerPixelX, enemy.y - playerPixelY);
+
+            if (dist < CELL_SIZE) {
+                handleDeath();
+                return;
+            }
+        }
+    }
+
+    // Alan Kaplama Algoritması (Flood Fill)
+    function captureArea() {
+        // İzi Karaya Dönüştür
+        for (let pt of trail) {
+            grid[pt.r][pt.c] = LAND;
+        }
+
+        // Flood fill ile düşmanların ulaşabildiği açık siyah alanları bul
+        let visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+
+        function floodFill(r, c) {
+            let queue = [{ r, c }];
+            visited[r][c] = true;
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                let dirs = [{ r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 }];
+
+                for (let d of dirs) {
+                    let nr = curr.r + d.r;
+                    let nc = curr.c + d.c;
+
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                        if (grid[nr][nc] === SEA && !visited[nr][nc]) {
+                            visited[nr][nc] = true;
+                            queue.push({ r: nr, c: nc });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tüm Deniz Düşmanlarının bulunduğu noktalardan flood fill çalıştır
+        for (let enemy of seaEnemies) {
+            let er = Math.floor(enemy.y / CELL_SIZE);
+            let ec = Math.floor(enemy.x / CELL_SIZE);
+            if (er >= 0 && er < ROWS && ec >= 0 && ec < COLS && grid[er][ec] === SEA) {
+                if (!visited[er][ec]) {
+                    floodFill(er, ec);
+                }
+            }
+        }
+
+        // Düşmanın ulaşamadığı (visited == false olan) tüm SEA hücrelerini KAPLA (LAND yap)
+        let newlyCaptured = 0;
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (grid[r][c] === SEA && !visited[r][c]) {
+                    grid[r][c] = LAND;
+                    newlyCaptured++;
+                }
+            }
+        }
+
+        score += newlyCaptured * 10 + trail.length * 2;
+        trail = [];
+        player.isDrawing = false;
+        player.vx = 0;
+        player.vy = 0;
+
+        updatePercent();
+        updateHUD();
+
+        // Seviye Tamamlama Kontrolü (%75 ve Üzeri)
+        if (completedPercent >= 75) {
+            setTimeout(() => {
+                alert(`Tebrikler! Seviye ${level} Tamamlandı!`);
+                level++;
+                startLevel();
+            }, 100);
+        }
+    }
+
+    // Can Kaybı
+    function handleDeath() {
+        lives--;
+        // Çizilmekte olan izleri temizle
+        for (let pt of trail) {
+            grid[pt.r][pt.c] = SEA;
+        }
+        trail = [];
+        player.isDrawing = false;
+        player.vx = 0;
+        player.vy = 0;
+
+        // Oyuncuyu Güvenli Başlangıç Noktasına Taşı
+        player.x = Math.floor(COLS / 2);
+        player.y = 0;
+
+        updateHUD();
+
+        if (lives <= 0) {
+            setTimeout(() => {
+                alert("Oyun Bitti! Yeniden başlatılıyor.");
+                initGame();
+            }, 100);
+        }
+    }
+
+    // Ekran Çizimi
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Izgarayı ve Alanları Çiz
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                let px = c * CELL_SIZE;
+                let py = r * CELL_SIZE;
+                let tile = grid[r][c];
+
+                if (tile === LAND) {
+                    // Kareli Açık Gri / Beyaz Desen (Referans Görselindeki Gibi)
+                    ctx.fillStyle = '#d8d8d8';
+                    ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    ctx.strokeStyle = '#b0b0b0';
+                    ctx.strokeRect(px, py, CELL_SIZE, CELL_SIZE);
+                } else if (tile === SEA) {
+                    // Siyah / Koyu Desenli Alan
+                    ctx.fillStyle = '#0a0a0a';
+                    ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                } else if (tile === TRAIL) {
+                    // Mavi İz Noktaları
+                    ctx.fillStyle = '#0000a8';
+                    ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillRect(px + 3, py + 3, 4, 4);
+                }
+            }
+        }
+
+        // 2. Deniz Düşmanları (Turuncu Kareler)
+        for (let enemy of seaEnemies) {
+            ctx.fillStyle = '#ff9900';
+            ctx.fillRect(enemy.x - 4, enemy.y - 4, 8, 8);
+            ctx.strokeStyle = '#884400';
+            ctx.strokeRect(enemy.x - 4, enemy.y - 4, 8, 8);
+        }
+
+        // 3. Kara Düşmanları (Kırmızı Kareler)
+        for (let enemy of landEnemies) {
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(enemy.x - 4, enemy.y - 4, 8, 8);
+            ctx.strokeStyle = '#880000';
+            ctx.strokeRect(enemy.x - 4, enemy.y - 4, 8, 8);
+        }
+
+        // 4. Oyuncu (Mavi Kare)
+        ctx.fillStyle = '#0002ff';
+        ctx.fillRect(player.x * CELL_SIZE, player.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(player.x * CELL_SIZE + 2, player.y * CELL_SIZE + 2, 6, 6);
+    }
+
+    // Ana Oyun Döngüsü
+    let tickCounter = 0;
+    function gameLoop() {
+        tickCounter++;
+
+        // Oyuncu Hızını Dengeli Tutmak İçin Her 3 Frame'de Bir Güncelle
+        if (tickCounter % 3 === 0) {
+            updatePlayer();
+        }
+
+        updateEnemies();
+        render();
+
+        gameLoopId = requestAnimationFrame(gameLoop);
+    }
+
+    function restartGame() {
+        initGame();
+    }
+
+    // Başlat
+    initGame();
+    gameLoop();
+</script>
+</body>
+</html>

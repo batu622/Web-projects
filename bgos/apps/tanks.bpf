@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tanks - KolibriOS</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #0d1117;
+            color: #000000;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+        }
+
+        /* KolibriOS / Retro Pencere Çerçevesi */
+        .window {
+            background-color: #008080;
+            border: 2px solid #ffffff;
+            border-right-color: #004040;
+            border-bottom-color: #004040;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            width: 660px;
+        }
+
+        /* Başlık Çubuğu */
+        .title-bar {
+            background: linear-gradient(to right, #008080, #004060);
+            height: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 4px 0 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffffff;
+            border-bottom: 1px solid #005555;
+        }
+
+        .win-controls {
+            display: flex;
+            gap: 2px;
+        }
+
+        .win-btn {
+            width: 14px;
+            height: 14px;
+            background-color: #d4d0c8;
+            border: 1px solid #ffffff;
+            border-right-color: #404040;
+            border-bottom-color: #404040;
+            color: #000000;
+            font-size: 9px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .win-btn.close {
+            background-color: #d01010;
+            color: #ffffff;
+            border-color: #ff6060;
+            border-right-color: #600000;
+            border-bottom-color: #600000;
+        }
+
+        /* Canvas ve Oyun Wrapper */
+        .game-wrapper {
+            background-color: #000000;
+            padding: 2px;
+            display: flex;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            background-color: #008000;
+            image-rendering: pixelated;
+        }
+
+        /* Türkçe HUD / Skor Paneli (Orijinaldeki Alt Bar Düzeni) */
+        .hud-bar {
+            background-color: #c0c0c0;
+            height: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            font-size: 12px;
+            font-weight: bold;
+            border-top: 2px solid #808080;
+            padding: 0 10px;
+        }
+
+        .hud-item {
+            background-color: #ffffff;
+            padding: 2px 10px;
+            border: 1px solid #808080;
+            border-right-color: #ffffff;
+            border-bottom-color: #ffffff;
+        }
+
+        .hud-level { color: #00aa00; }
+        .hud-lives { color: #0002ff; }
+        .hud-score { color: #ff0000; }
+
+        /* Alt İpucu Çubuğu */
+        .controls-hint {
+            background-color: #d4d0c8;
+            padding: 4px 8px;
+            font-size: 10px;
+            border-top: 1px solid #808080;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            color: #000000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="window">
+    <!-- Başlık Çubuğu -->
+    <div class="title-bar">
+        <span>Oyun *TANKS* andrew_programmer tarafından yapılmıştır</span>
+        <div class="win-controls">
+            <div class="win-btn" onclick="resetGame()">-</div>
+            <div class="win-btn close" onclick="resetGame()">X</div>
+        </div>
+    </div>
+
+    <!-- Oyun Canvası -->
+    <div class="game-wrapper">
+        <canvas id="gameCanvas" width="640" height="440"></canvas>
+    </div>
+
+    <!-- Türkçe Skor ve Durum Paneli -->
+    <div class="hud-bar">
+        <div class="hud-item hud-level">SEVİYE <span id="levelVal">001</span></div>
+        <div class="hud-item hud-lives">CAN <span id="livesVal">003</span></div>
+        <div class="hud-item hud-score">SKOR <span id="scoreVal">000</span></div>
+    </div>
+
+    <!-- İpucu Çubuğu -->
+    <div class="controls-hint">
+        <span>[YÖN / WASD]: Hareket Et</span>
+        <span>[BOŞLUK / F]: Ateş Et</span>
+        <span>[R]: Yeniden Başlat</span>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const levelVal = document.getElementById('levelVal');
+    const livesVal = document.getElementById('livesVal');
+    const scoreVal = document.getElementById('scoreVal');
+
+    const COLS = 32;
+    const ROWS = 22;
+    const TILE_SIZE = 20;
+
+    // Karo Tipleri
+    const T_GRASS = 0;   // Yeşil Çim
+    const T_CONCRETE = 1;// Gri Kırılmaz Beton Duvar
+    const T_BRICK = 2;   // Kırmızı Kırılabilir Tuğla Duvar
+    const T_WATER = 3;   // Mavi Su (Tanklar geçemez, mermi geçer)
+    const T_TREE = 4;    // Ağaç / Çalı
+    const T_ROAD = 5;    // Gri Yol
+    const T_BASE = 6;    // Mavi/Kırmızı Üs Hedefi
+
+    let map = [];
+    let player = { x: 3, y: 19, dir: 0, speed: 2, cooldown: 0 }; // 0:Yukarı, 1:Sağ, 2:Aşağı, 3:Sol
+    let bullets = [];
+    let enemies = [];
+
+    let level = 1;
+    let lives = 3;
+    let score = 0;
+    let gameLoopId = null;
+
+    // Harita Tasarımı (KolibriOS Tanks Orijinal Harita Yapısına Uygun)
+    const LEVEL_MAP = [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,3,3,0,4,0,0,4,0,0,2,2,5,5,5,2,2,4,4,3,3,0,0,0,0,0,0,0,0,0,0,1],
+        [1,3,3,0,4,0,0,4,0,0,2,2,5,5,5,2,2,4,4,3,3,0,0,0,0,0,0,0,0,0,0,1],
+        [1,3,3,0,0,0,2,2,2,2,2,2,5,5,5,2,2,4,4,4,0,0,6,0,0,2,2,0,0,0,0,1],
+        [1,3,3,0,0,0,2,2,2,2,2,2,5,5,5,2,2,4,4,4,0,0,0,0,0,2,2,0,0,0,0,1],
+        [1,3,3,0,0,6,0,0,2,2,0,0,5,5,5,0,0,4,4,0,0,6,0,0,0,2,2,0,0,0,0,1],
+        [1,3,3,0,0,0,0,0,2,2,0,0,5,5,5,0,0,4,4,0,0,0,0,0,0,2,2,2,2,5,5,1],
+        [1,5,5,5,0,0,0,0,2,2,0,0,5,5,5,0,0,4,4,0,0,3,3,5,5,2,2,2,2,5,5,1],
+        [1,5,5,5,3,3,0,0,5,5,5,5,5,5,5,5,5,4,4,0,0,3,3,5,5,2,2,5,5,5,5,1],
+        [1,0,0,0,3,3,0,0,5,5,5,5,5,5,5,5,5,4,4,0,0,3,3,0,0,2,2,5,5,5,5,1],
+        [1,0,0,0,3,3,0,0,5,5,0,0,3,3,3,0,0,4,4,0,6,3,3,0,0,2,2,5,5,5,5,1],
+        [1,4,4,0,3,3,0,0,5,5,0,0,3,3,3,0,0,4,4,0,0,3,3,0,0,2,2,5,5,5,5,1],
+        [1,4,4,0,3,3,4,4,5,5,5,5,5,5,5,5,5,4,4,0,0,3,3,0,0,2,2,2,2,2,2,1],
+        [1,4,4,0,3,3,4,4,5,5,5,5,5,5,5,5,5,4,4,0,0,3,3,0,0,2,2,2,2,2,2,1],
+        [1,2,2,2,2,2,5,5,5,5,0,0,4,4,0,0,5,5,5,5,2,2,2,3,3,3,0,0,0,0,0,1],
+        [1,2,2,2,2,2,5,5,5,5,0,0,4,4,0,0,5,5,5,5,2,2,2,3,3,3,0,0,0,0,0,1],
+        [1,2,2,0,0,0,5,5,5,5,0,0,4,4,0,0,5,5,5,5,2,2,2,3,3,3,6,0,0,0,0,1],
+        [1,2,2,0,0,0,5,5,5,5,0,0,4,4,0,0,5,5,5,5,2,2,2,3,3,3,0,0,0,0,0,1],
+        [1,0,0,6,0,0,5,5,5,5,0,0,0,0,0,0,5,5,5,5,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,0,0,0,0,0,5,5,5,5,0,0,0,0,0,0,5,5,5,5,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,0,0,0,0,0,5,5,5,5,5,5,5,5,5,5,5,5,5,5,2,2,2,2,2,2,2,2,2,2,2,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+
+    function initGame() {
+        level = 1;
+        lives = 3;
+        score = 0;
+        startLevel();
+    }
+
+    function startLevel() {
+        // Haritayı Kopyala
+        map = LEVEL_MAP.map(row => [...row]);
+
+        // Oyuncu Başlangıç Konumu
+        player = { x: 3 * TILE_SIZE, y: 19 * TILE_SIZE, dir: 0, speed: 2, cooldown: 0 };
+        bullets = [];
+
+        // Düşman Tanklarını Oluştur
+        enemies = [
+            { x: 10 * TILE_SIZE, y: 1 * TILE_SIZE, dir: 2, speed: 1, cooldown: 0, shootTimer: 0 },
+            { x: 20 * TILE_SIZE, y: 1 * TILE_SIZE, dir: 2, speed: 1, cooldown: 0, shootTimer: 0 },
+            { x: 28 * TILE_SIZE, y: 7 * TILE_SIZE, dir: 3, speed: 1, cooldown: 0, shootTimer: 0 },
+            { x: 15 * TILE_SIZE, y: 10 * TILE_SIZE, dir: 1, speed: 1, cooldown: 0, shootTimer: 0 }
+        ];
+
+        updateHUD();
+    }
+
+    function updateHUD() {
+        levelVal.innerText = String(level).padStart(3, '0');
+        livesVal.innerText = String(lives).padStart(3, '0');
+        scoreVal.innerText = String(score).padStart(3, '0');
+    }
+
+    // Tuş Kontrolleri
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+        keys[e.key.toLowerCase()] = true;
+        if (e.key.toLowerCase() === 'r') resetGame();
+    });
+    window.addEventListener('keyup', (e) => {
+        keys[e.key.toLowerCase()] = false;
+    });
+
+    // Çarpışma Kontrolü (Tanklar İçin)
+    function canMoveTo(x, y) {
+        const margin = 2;
+        const corners = [
+            { x: x + margin, y: y + margin },
+            { x: x + TILE_SIZE - margin, y: y + margin },
+            { x: x + margin, y: y + TILE_SIZE - margin },
+            { x: x + TILE_SIZE - margin, y: y + TILE_SIZE - margin }
+        ];
+
+        for (let pt of corners) {
+            let c = Math.floor(pt.x / TILE_SIZE);
+            let r = Math.floor(pt.y / TILE_SIZE);
+
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+
+            let tile = map[r][c];
+            // Kırılmaz Beton, Tuğla Duvar ve Su Tank Geçişine Engeldir
+            if (tile === T_CONCRETE || tile === T_BRICK || tile === T_WATER || tile === T_BASE) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Güncelleme Mantığı
+    function update() {
+        // 1. Oyuncu Hareketi
+        let dx = 0, dy = 0;
+        if (keys['arrowup'] || keys['w']) { dy = -player.speed; player.dir = 0; }
+        else if (keys['arrowright'] || keys['d']) { dx = player.speed; player.dir = 1; }
+        else if (keys['arrowdown'] || keys['s']) { dy = player.speed; player.dir = 2; }
+        else if (keys['arrowleft'] || keys['a']) { dx = -player.speed; player.dir = 3; }
+
+        if (dx !== 0 || dy !== 0) {
+            let newX = player.x + dx;
+            let newY = player.y + dy;
+            if (canMoveTo(newX, newY)) {
+                player.x = newX;
+                player.y = newY;
+            }
+        }
+
+        // Oyuncu Ateş Etme
+        if (player.cooldown > 0) player.cooldown--;
+        if ((keys[' '] || keys['f']) && player.cooldown === 0) {
+            shootBullet(player.x, player.y, player.dir, true);
+            player.cooldown = 20;
+        }
+
+        // 2. Düşman Tank Yapay Zekası & Hareketi
+        for (let enemy of enemies) {
+            let edx = 0, edy = 0;
+            if (enemy.dir === 0) edy = -enemy.speed;
+            else if (enemy.dir === 1) edx = enemy.speed;
+            else if (enemy.dir === 2) edy = enemy.speed;
+            else if (enemy.dir === 3) edx = -enemy.speed;
+
+            if (canMoveTo(enemy.x + edx, enemy.y + edy)) {
+                enemy.x += edx;
+                enemy.y += edy;
+            } else {
+                // Engel görünce rastgele yön değiştir
+                enemy.dir = Math.floor(Math.random() * 4);
+            }
+
+            // Düşman Ateş Etme
+            enemy.shootTimer++;
+            if (enemy.shootTimer > 60 + Math.random() * 40) {
+                shootBullet(enemy.x, enemy.y, enemy.dir, false);
+                enemy.shootTimer = 0;
+            }
+        }
+
+        // 3. Mermilerin Hareketi ve Çarpışmalar
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i];
+            let bSpeed = 4;
+
+            if (b.dir === 0) b.y -= bSpeed;
+            else if (b.dir === 1) b.x += bSpeed;
+            else if (b.dir === 2) b.y += bSpeed;
+            else if (b.dir === 3) b.x -= bSpeed;
+
+            let c = Math.floor((b.x + 4) / TILE_SIZE);
+            let r = Math.floor((b.y + 4) / TILE_SIZE);
+
+            // Harita Dışına Çıktı mı?
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) {
+                bullets.splice(i, 1);
+                continue;
+            }
+
+            let tile = map[r][c];
+
+            // Tuğla Duvara Çarptı
+            if (tile === T_BRICK) {
+                map[r][c] = T_ROAD; // Tuğlayı kır
+                bullets.splice(i, 1);
+                continue;
+            }
+
+            // Betona Çarptı
+            if (tile === T_CONCRETE) {
+                bullets.splice(i, 1);
+                continue;
+            }
+
+            // Üs Hedefine Çarptı
+            if (tile === T_BASE) {
+                map[r][c] = T_ROAD;
+                bullets.splice(i, 1);
+                if (b.isPlayer) {
+                    score += 50;
+                    updateHUD();
+                }
+                continue;
+            }
+
+            // Oyuncunun Mermisi Düşmana Çarptı mı?
+            if (b.isPlayer) {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    let enemy = enemies[j];
+                    if (Math.abs(b.x - enemy.x) < 14 && Math.abs(b.y - enemy.y) < 14) {
+                        enemies.splice(j, 1);
+                        bullets.splice(i, 1);
+                        score += 10;
+                        updateHUD();
+
+                        if (enemies.length === 0) {
+                            setTimeout(() => {
+                                alert(`Tebrikler! Seviye ${level} Tamamlandı!`);
+                                level++;
+                                startLevel();
+                            }, 100);
+                        }
+                        break;
+                    }
+                }
+            } 
+            // Düşman Mermisi Oyuncuya Çarptı mı?
+            else {
+                if (Math.abs(b.x - player.x) < 14 && Math.abs(b.y - player.y) < 14) {
+                    bullets.splice(i, 1);
+                    lives--;
+                    updateHUD();
+
+                    if (lives <= 0) {
+                        alert("Oyun Bitti! Tüm canlarınızı kaybettiniz.");
+                        initGame();
+                    } else {
+                        player.x = 3 * TILE_SIZE;
+                        player.y = 19 * TILE_SIZE;
+                    }
+                    continue;
+                }
+            }
+        }
+    }
+
+    function shootBullet(x, y, dir, isPlayer) {
+        bullets.push({
+            x: x + 6,
+            y: y + 6,
+            dir: dir,
+            isPlayer: isPlayer
+        });
+    }
+
+    // Çizim Fonksiyonları
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Haritayı Çiz
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                let px = c * TILE_SIZE;
+                let py = r * TILE_SIZE;
+                let tile = map[r][c];
+
+                if (tile === T_GRASS) {
+                    ctx.fillStyle = '#00a800';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = '#008800';
+                    ctx.fillRect(px + 2, py + 2, 4, 4);
+                } else if (tile === T_CONCRETE) {
+                    ctx.fillStyle = '#a8a8a8';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.strokeStyle = '#545454';
+                    ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+                } else if (tile === T_BRICK) {
+                    ctx.fillStyle = '#fc3800';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = '#a80000';
+                    ctx.fillRect(px, py + 4, TILE_SIZE, 2);
+                    ctx.fillRect(px, py + 12, TILE_SIZE, 2);
+                } else if (tile === T_WATER) {
+                    ctx.fillStyle = '#00a8fc';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillRect(px + 4, py + 6, 8, 2);
+                } else if (tile === T_TREE) {
+                    ctx.fillStyle = '#008800';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.fillStyle = '#a800a8'; // Orijinal Mor Ağaç Detayı
+                    ctx.fillRect(px + 4, py + 4, 12, 12);
+                } else if (tile === T_ROAD) {
+                    ctx.fillStyle = '#808080';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                } else if (tile === T_BASE) {
+                    ctx.fillStyle = '#0000fc';
+                    ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                    ctx.strokeStyle = '#fc0000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                }
+            }
+        }
+
+        // 2. Oyuncu Tankını Çiz (Sarı / Turuncu)
+        drawTank(player.x, player.y, player.dir, '#fcfc00', '#a8a800');
+
+        // 3. Düşman Tanklarını Çiz (Sarı - Kırmızı Detaylı)
+        for (let enemy of enemies) {
+            drawTank(enemy.x, enemy.y, enemy.dir, '#fcfc00', '#fc0000');
+        }
+
+        // 4. Mermileri Çiz
+        ctx.fillStyle = '#fcfc00';
+        for (let b of bullets) {
+            ctx.fillRect(b.x, b.y, 6, 6);
+        }
+    }
+
+    function drawTank(x, y, dir, bodyColor, detailColor) {
+        ctx.save();
+        ctx.translate(x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+        ctx.rotate((dir * 90 * Math.PI) / 180);
+
+        // Gövde
+        ctx.fillStyle = bodyColor;
+        ctx.fillRect(-8, -8, 16, 16);
+
+        // Paletler
+        ctx.fillStyle = detailColor;
+        ctx.fillRect(-10, -9, 4, 18);
+        ctx.fillRect(6, -9, 4, 18);
+
+        // Namlu
+        ctx.fillRect(-2, -12, 4, 8);
+
+        ctx.restore();
+    }
+
+    function gameLoop() {
+        update();
+        render();
+        gameLoopId = requestAnimationFrame(gameLoop);
+    }
+
+    function resetGame() {
+        initGame();
+    }
+
+    initGame();
+    gameLoop();
+</script>
+</body>
+</html>
